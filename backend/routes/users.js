@@ -1,0 +1,128 @@
+const express = require('express');
+const router = express.Router();
+const { authenticate } = require('../middleware/auth');
+const User = require('../models/User');
+const Activity = require('../models/Activity');
+const { decrypt } = require('../utils/encryption');
+const driveService = require('../services/googleDrive');
+
+// GET /api/users/profile
+router.get('/profile', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-googleAccessToken -googleRefreshToken -refreshToken');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Get storage from Google Drive (optional - fall back to local if not connected)
+    let storageInfo = {};
+    if (user.googleConnected && user.googleAccessToken) {
+      try {
+        const { accessToken, refreshToken } = {
+          accessToken: decrypt(user.googleAccessToken),
+          refreshToken: decrypt(user.googleRefreshToken),
+        };
+        storageInfo = await driveService.getStorageQuota(accessToken, refreshToken);
+      } catch (_) {}
+    }
+
+    res.json({ user, storageInfo });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// PATCH /api/users/profile - Update profile
+router.patch('/profile', authenticate, async (req, res) => {
+  try {
+    const { name, photo, preferences } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (name) user.name = name;
+    if (photo) user.photo = photo;
+    if (preferences) {
+      user.preferences = { ...user.preferences, ...preferences };
+      if (preferences.notifications) {
+        user.preferences.notifications = { ...user.preferences.notifications, ...preferences.notifications };
+      }
+    }
+
+    await user.save();
+    res.json({ user: user.toPublic() });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// GET /api/users/activities - User activity log
+router.get('/activities', authenticate, async (req, res) => {
+  try {
+    const { page = 1, limit = 30, action } = req.query;
+    const query = { userId: req.user._id };
+    if (action) query.action = action;
+
+    const [activities, total] = await Promise.all([
+      Activity.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * parseInt(limit))
+        .limit(parseInt(limit))
+        .populate('fileId', 'name mimeType')
+        .populate('folderId', 'name')
+        .lean(),
+      Activity.countDocuments(query),
+    ]);
+
+    res.json({ activities, total, page: parseInt(page) });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch activities' });
+  }
+});
+
+// GET /api/users/stats - User statistics
+router.get('/stats', authenticate, async (req, res) => {
+  try {
+    const File = require('../models/File');
+    const Folder = require('../models/Folder');
+
+    const [fileCount, folderCount, starredCount, activities] = await Promise.all([
+      File.countDocuments({ userId: req.user._id, trashed: false }),
+      Folder.countDocuments({ userId: req.user._id, trashed: false }),
+      File.countDocuments({ userId: req.user._id, starred: true }),
+      Activity.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(10).lean(),
+    ]);
+
+    // Upload activity for last 7 days
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentUploads = await Activity.countDocuments({
+      userId: req.user._id,
+      action: 'upload',
+      createdAt: { $gte: weekAgo },
+    });
+
+    res.json({ fileCount, folderCount, starredCount, recentUploads, recentActivity: activities });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// DELETE /api/users/account - Delete account
+router.delete('/account', authenticate, async (req, res) => {
+  try {
+    const File = require('../models/File');
+    const Folder = require('../models/Folder');
+
+    // Cascade delete all user data
+    await Promise.all([
+      File.deleteMany({ userId: req.user._id }),
+      Folder.deleteMany({ userId: req.user._id }),
+      Activity.deleteMany({ userId: req.user._id }),
+      require('../models/Notification').deleteMany({ userId: req.user._id }),
+      User.findByIdAndDelete(req.user._id),
+    ]);
+
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
+module.exports = router;
