@@ -5,7 +5,7 @@
 | Layer | Host | URL | Status |
 |-------|------|-----|--------|
 | Backend API | Render | `https://airdrive-backend-6k4c.onrender.com` | Live |
-| Frontend app | Vercel | `https://air-drive-snowy.vercel.app` | Not live: returns 404 |
+| Frontend app | Vercel | `https://air-drive-j5p1nb45r-harsh-parate-s-projects.vercel.app` | Live after latest Vercel deployment |
 | Database | MongoDB Atlas | configured through Render env vars | Connected by backend |
 
 Backend health check:
@@ -103,7 +103,7 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=<email-user>
 EMAIL_PASS=<gmail-app-password>
-CLIENT_URL=https://air-drive-snowy.vercel.app
+CLIENT_URL=https://air-drive-j5p1nb45r-harsh-parate-s-projects.vercel.app
 ```
 
 ## Google OAuth
@@ -112,7 +112,7 @@ In Google Cloud Console, update the OAuth client:
 
 ```text
 Authorized JavaScript origin:
-https://air-drive-snowy.vercel.app
+https://air-drive-j5p1nb45r-harsh-parate-s-projects.vercel.app
 
 Authorized redirect URI:
 https://airdrive-backend-6k4c.onrender.com/auth/google/callback
