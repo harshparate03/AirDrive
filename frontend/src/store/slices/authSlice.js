@@ -95,10 +95,12 @@ export const fetchProfile = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   'auth/logout',
-  async (_, { rejectWithValue }) => {
+  async () => {
     try {
       await api.post('/auth/logout')
-    } catch (_) {}
+    } catch {
+      // Local logout should still complete if the server is unreachable.
+    }
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
   }

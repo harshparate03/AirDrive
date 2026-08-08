@@ -45,8 +45,27 @@ setupSocketHandlers(io);
 
 // Security middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// CORS - allow dev, CLIENT_URL, and any Vercel deployment
+const allowedOrigins = () => {
+  const origins = ['http://localhost:5173', 'http://localhost:3000'];
+  if (process.env.CLIENT_URL) origins.push(process.env.CLIENT_URL);
+  if (process.env.CORS_ORIGINS) {
+    process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean).forEach(o => origins.push(o));
+  }
+  return origins;
+};
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin(origin, callback) {
+    // Allow requests with no origin (same-origin, curl, mobile apps)
+    if (!origin) return callback(null, true);
+    const origins = allowedOrigins();
+    if (origins.includes(origin)) return callback(null, true);
+    // Allow any Vercel preview/production domain
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

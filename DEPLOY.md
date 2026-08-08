@@ -1,127 +1,128 @@
-# Air Drive — Production Deployment Guide
+# Air Drive Production Deployment
 
-This project is ready to deploy. It uses a **3-part architecture**:
+## Current Status
 
-| Layer | Host | URL |
-|-------|------|-----|
-| Frontend (React) | **Vercel** | `https://airdrive.vercel.app` (example) |
-| Backend (Express + Socket.io + uploads) | **Render** | `https://airdrive-backend.onrender.com` (example) |
-| Database (MongoDB Atlas) | **Atlas (already cloud-hosted)** | your existing connection string |
+| Layer | Host | URL | Status |
+|-------|------|-----|--------|
+| Backend API | Render | `https://airdrive-backend-6k4c.onrender.com` | Live |
+| Frontend app | Vercel | `https://air-drive-snowy.vercel.app` | Not live: returns 404 |
+| Database | MongoDB Atlas | configured through Render env vars | Connected by backend |
 
-All three connect to the same MongoDB Atlas database.
-
----
-
-## Prerequisites
-
-1. GitHub account (`harshparate03`) — repo `AIrDrive`
-2. Vercel account
-3. Render account
-4. The code pushed to GitHub (see Step 0)
-
----
-
-## Step 0 — Push code to GitHub
-
-The git repo is already initialized. Run these from `d:/AirDrive`:
+Backend health check:
 
 ```bash
-git add .
-git commit -m "Initial production-ready Air Drive"
-git branch -M main
-git remote add origin https://github.com/harshparate03/AIrDrive.git
-git push -u origin main
+curl https://airdrive-backend-6k4c.onrender.com/health
 ```
 
-> You'll be prompted for your GitHub username + a personal access token (not your password).
-> Create a token at: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token with `repo` scope.
+Expected response:
 
----
-
-## Step 1 — Deploy Backend to Render
-
-1. Go to [render.com](https://render.com) → **New → Web Service**
-2. Connect your GitHub repo: `harshparate03/AIrDrive`
-3. **Root directory:** `backend`
-4. **Build command:** `npm install`
-5. **Start command:** `node server.js`
-6. **Instance type:** Free
-7. Add these **Environment Variables** (from your `backend/.env`):
-
+```json
+{"status":"OK","message":"Air Drive API is running"}
 ```
-MONGODB_URI=<your atlas uri>
-JWT_SECRET=<your secret>
-JWT_REFRESH_SECRET=<your secret>
-ENCRYPTION_KEY=<your 32-char key>
-GOOGLE_CLIENT_ID=<your google client id>
-GOOGLE_CLIENT_SECRET=<your google client secret>
-GOOGLE_REDIRECT_URI=https://<your-backend>.onrender.com/auth/google/callback
-OPENAI_API_KEY=<optional>
-CLIENT_URL=https://<your-vercel-app>.vercel.app
+
+## Local Verification
+
+Run these before deploying:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+
+cd ../backend
+npm test
+```
+
+Current checks pass locally.
+
+## Frontend Deployment
+
+The frontend is build-ready, but the configured Vercel URL currently returns `404`.
+
+Use the existing Vercel project settings:
+
+| Setting | Value |
+|---------|-------|
+| Framework | Vite |
+| Root directory | `frontend` |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Install command | `npm install` |
+
+Required Vercel environment variables:
+
+```text
+VITE_API_URL=https://airdrive-backend-6k4c.onrender.com/api
+VITE_SOCKET_URL=https://airdrive-backend-6k4c.onrender.com
+VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
+```
+
+Deploy command:
+
+```bash
+vercel deploy --prod --yes
+```
+
+If the CLI returns `fetch failed`, retry from a normal terminal or deploy from the Vercel dashboard. In this workspace the Vercel CLI has a valid token, but the deployment request failed while talking to the Vercel API.
+
+## Backend Deployment
+
+Render service:
+
+```text
+https://airdrive-backend-6k4c.onrender.com
+```
+
+Render settings:
+
+| Setting | Value |
+|---------|-------|
+| Root directory | `backend` |
+| Build command | `npm install` |
+| Start command | `node server.js` |
+| Health path | `/health` |
+
+Required Render environment variables:
+
+```text
 NODE_ENV=production
 PORT=10000
+MONGODB_URI=<mongodb-atlas-uri>
+JWT_SECRET=<secret>
+JWT_EXPIRES_IN=7d
+JWT_REFRESH_SECRET=<secret>
+JWT_REFRESH_EXPIRES_IN=30d
+GOOGLE_CLIENT_ID=<google-oauth-client-id>
+GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
+GOOGLE_REDIRECT_URI=https://airdrive-backend-6k4c.onrender.com/auth/google/callback
+OPENAI_API_KEY=<optional-openai-key>
+OPENAI_BASE_URL=https://api.openai.com/v1
+ENCRYPTION_KEY=<32-character-key>
+ADMIN_EMAIL=<admin-email>
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=<email-user>
+CLIENT_URL=https://air-drive-snowy.vercel.app
 ```
 
-8. Click **Create Web Service**. Wait for the deploy (1–3 min). Note the URL, e.g. `https://airdrive-backend.onrender.com`.
+## Google OAuth
 
-> **Important:** The `backend/render.yaml` is already included for reference, but clicking through the dashboard is simplest.
+In Google Cloud Console, update the OAuth client:
 
----
+```text
+Authorized JavaScript origin:
+https://air-drive-snowy.vercel.app
 
-## Step 2 — Deploy Frontend to Vercel
-
-1. Go to [vercel.com](https://vercel.com) → **Add New → Project**
-2. Import repo `harshparate03/AIrDrive`
-3. **Root directory:** `frontend`
-4. **Framework preset:** Vite (auto-detected)
-5. **Build command:** `npm run build`
-6. **Output directory:** `dist`
-7. Add these **Environment Variables**:
-
+Authorized redirect URI:
+https://airdrive-backend-6k4c.onrender.com/auth/google/callback
 ```
-VITE_API_URL=https://<your-backend>.onrender.com/api
-VITE_SOCKET_URL=https://<your-backend>.onrender.com
-VITE_GOOGLE_CLIENT_ID=<your google client id>
-```
-
-8. Click **Deploy**. Your app will be live, e.g. `https://airdrive.vercel.app`.
-
-> `frontend/vercel.json` already contains the SPA rewrite + asset caching config.
-
----
-
-## Step 3 — Update Google OAuth (if using Google sign-in)
-
-In Google Cloud Console → APIs & Services → Credentials → your OAuth client:
-
-- **Authorized JavaScript origins:** add `https://<your-vercel-app>.vercel.app`
-- **Authorized redirect URIs:** add `https://<your-backend>.onrender.com/auth/google/callback`
-
----
-
-## Step 4 — Verify
-
-1. Open `https://<your-vercel-app>.vercel.app`
-2. Click **Sign up** → create an account → you should reach the dashboard
-3. Upload a file, share a link, test AI features
-4. Check the backend health: `https://<your-backend>.onrender.com/health` → `{"status":"OK"}`
-
----
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| "Network error" on login/signup | `VITE_API_URL` wrong or backend not deployed / CORS. Backend already allows `CLIENT_URL`. |
-| Share links 404 | `CLIENT_URL` env on backend must be the Vercel URL (share links build from it). |
-| Google Drive connect fails | Authorized redirect URI must match the Render backend exactly. |
-| Upload errors | Local disk uploads work on Render (free tier has ephemeral disk). Use the local fallback — no Google token needed. |
-| Socket not connecting | `VITE_SOCKET_URL` must be the Render https URL. |
-
----
-
-## Architecture Notes
-
-- **Why not put the backend on Vercel?** The backend uses Socket.io (persistent webSockets) and local-disk file uploads, both of which don't work on Vercel's stateless serverless functions. Render runs a persistent Node server, which supports both.
-- **MongoDB Atlas** is already cloud-hosted, so no database deployment is needed — it's just a connection string.
-- **Local file storage fallback** means the app is fully functional even without Google Drive credentials connected.
+| Frontend URL returns 404 | Redeploy the Vercel project and confirm the production domain is assigned |
+| Login shows network error | Confirm `VITE_API_URL` points to `https://airdrive-backend-6k4c.onrender.com/api` |
+| Socket does not connect | Confirm `VITE_SOCKET_URL` points to `https://airdrive-backend-6k4c.onrender.com` |
+| Share links point to wrong frontend | Update Render `CLIENT_URL` to the live Vercel URL |
+| Backend health check is slow | Wait for Render cold start, then retry `/health` |

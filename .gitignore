@@ -8,3 +8,7 @@ frontend/node_modules/
 frontend/dist/
 backend/.env
 *.local
+.vercel
+.env*
+render-*.json
+vercel-*.json

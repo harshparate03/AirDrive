@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import { openModal, setSearchQuery, toggleTheme } from '../store/slices/uiSlice'
+import { openModal, toggleTheme } from '../store/slices/uiSlice'
 
 /**
  * Global keyboard shortcuts for Air Drive

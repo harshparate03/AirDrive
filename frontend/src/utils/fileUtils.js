@@ -1,7 +1,7 @@
 import {
   HiDocument, HiPhotograph, HiFilm, HiMusicNote,
   HiCode, HiArchive, HiTable, HiPresentationChartBar,
-  HiDocumentText, HiFolder,
+  HiDocumentText,
 } from 'react-icons/hi'
 
 export const getFileIcon = (mimeType = '') => {
