@@ -78,10 +78,10 @@ router.post('/register', async (req, res) => {
     const user = new User({ name, email: email.toLowerCase(), password });
     await user.save();
 
-    // Send welcome email (best effort)
-    try {
-      await sendWelcomeEmail(user.email, user.name);
-    } catch (_) {}
+    // Send welcome email in the background. Signup should not fail if SMTP is unavailable.
+    sendWelcomeEmail(user.email, user.name).catch((err) => {
+      console.error('Welcome email send failed:', err.message);
+    });
 
     const clientInfo = getClientInfo(req);
     const io = req.app.get('io');

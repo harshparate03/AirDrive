@@ -102,6 +102,7 @@ ADMIN_EMAIL=<admin-email>
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=<email-user>
+EMAIL_PASS=<gmail-app-password>
 CLIENT_URL=https://air-drive-snowy.vercel.app
 ```
 

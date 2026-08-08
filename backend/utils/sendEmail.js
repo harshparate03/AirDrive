@@ -1,6 +1,10 @@
 const nodemailer = require('nodemailer');
 
 const createTransporter = () => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error('Email is not configured. Set EMAIL_USER and EMAIL_PASS.');
+  }
+
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.EMAIL_PORT) || 587,
@@ -10,6 +14,9 @@ const createTransporter = () => {
       pass: process.env.EMAIL_PASS,
     },
     tls: { rejectUnauthorized: false },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 };
 
