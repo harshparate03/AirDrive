@@ -1,6 +1,10 @@
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || '/api'
+const DEFAULT_API_URL = import.meta.env.PROD
+  ? 'https://airdrive-backend-6k4c.onrender.com/api'
+  : '/api'
+
+const API_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL
 
 const api = axios.create({
   baseURL: API_URL,
@@ -73,7 +77,7 @@ export const sharePreviewUrl = (token, password) => {
   const query = new URLSearchParams()
   if (password) query.set('password', password)
   const qs = query.toString()
-  return `/api/share/${token}/preview${qs ? `?${qs}` : ''}`
+  return `${API_URL}/share/${token}/preview${qs ? `?${qs}` : ''}`
 }
 
 // Download a shared file through the proxy (respects downloadDisabled)
