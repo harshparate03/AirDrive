@@ -19,7 +19,6 @@ import {
   HiLogout,
   HiMenu,
   HiRefresh,
-  HiServer,
   HiShare,
   HiShieldCheck,
   HiSpeakerphone,
@@ -44,7 +43,6 @@ const groups = [
       ["overview", "Dashboard Overview", HiHome],
       ["analytics", "Reports & Analytics", HiChartBar],
       ["activity", "Activity Monitoring", HiDocumentReport],
-      ["health", "System Health", HiServer],
     ],
   ],
   [
@@ -208,7 +206,6 @@ const Console = () => {
           {tab === "activity" && <Activity />}{" "}
           {tab === "security" && <Security />}{" "}
           {tab === "notifications" && <Notifications />}{" "}
-          {tab === "health" && <Health />}{" "}
           {tab === "settings" && <AdminSettings />}{" "}
           {tab === "profile" && <AdminProfile />}
         </main>
@@ -389,12 +386,6 @@ const Overview = ({ data }) => {
     ["File requests", data?.fileRequests, HiClipboardList],
     ["Activity (30d)", data?.totalInteractions30d, HiLightningBolt],
   ];
-  const reportRows = stats.map(([label, value]) => ({
-    label,
-    value: typeof value === "number" ? value : value || 0,
-    createdAt: new Date().toISOString(),
-  }));
-  const filters = useReportFilters(reportRows);
   return (
     <div className="space-y-6">
       <section className="admin-hero rounded-[2rem] p-8 text-white">
@@ -409,15 +400,6 @@ const Overview = ({ data }) => {
           and infrastructure from a purpose-built administration workspace.
         </p>
       </section>
-      <ReportBar
-        filters={filters}
-        title="Dashboard Overview"
-        rows={filters.filtered}
-        columns={[
-          { label: "Metric", value: (item) => item.label },
-          { label: "Current value", value: (item) => item.value },
-        ]}
-      />
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {stats.map(([l, v, I], n) => (
           <article className="glass-panel p-5" key={l}>
@@ -439,29 +421,11 @@ const Overview = ({ data }) => {
 };
 
 const AnalyticsPanel = ({ data }) => {
-  const rows = (data?.activityBreakdown || []).map((item) => ({
-    action: item._id || "other",
-    count: item.count,
-    createdAt: new Date().toISOString(),
-  }));
-  const filters = useReportFilters(rows);
   return (
     <div className="space-y-5">
       <Title
         title="Reports & Analytics"
-        sub="Filter platform usage and export a PDF summary."
-      />
-      <ReportBar
-        filters={filters}
-        title="Reports and Analytics"
-        rows={filters.filtered}
-        columns={[
-          {
-            label: "Action",
-            value: (item) => item.action.replaceAll("_", " "),
-          },
-          { label: "Count", value: (item) => item.count },
-        ]}
+        sub="Platform usage, storage, user growth, and activity trends."
       />
       <AdminAnalytics dashboard={data} />
     </div>
@@ -1037,48 +1001,6 @@ const Notifications = () => {
             ))}
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
-const Health = () => {
-  const q = useQuery({
-    queryKey: ["admin-health"],
-    queryFn: () => api.get("/admin/health").then((r) => r.data),
-    refetchInterval: 30000,
-  });
-  const filters = useReportFilters(q.data?.services || [], null);
-  return (
-    <div className="space-y-5">
-      <Title
-        title="System Health"
-        sub="Live database, API, authentication, email, AI, and storage status."
-      />
-      <ReportBar
-        filters={filters}
-        title="System Health"
-        rows={filters.filtered}
-        columns={[
-          { label: "Service", value: (s) => s.name },
-          { label: "Status", value: (s) => s.status?.replaceAll("_", " ") },
-          { label: "Detail", value: (s) => s.detail },
-        ]}
-      />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filters.filtered.map((s) => (
-          <article className="glass-panel p-5" key={s.name}>
-            <div className="flex items-center gap-3">
-              <span
-                className={`h-3 w-3 rounded-full ${s.status === "operational" ? "bg-emerald-400" : "bg-amber-400"}`}
-              />
-              <b>{s.name}</b>
-              <small className="ml-auto uppercase text-slate-500">
-                {s.status.replace("_", " ")}
-              </small>
-            </div>
-            <p className="mt-3 text-xs text-slate-500">{s.detail}</p>
-          </article>
-        ))}
       </div>
     </div>
   );
