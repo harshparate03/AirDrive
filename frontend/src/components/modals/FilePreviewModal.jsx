@@ -1,58 +1,66 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useSelector, useDispatch } from 'react-redux'
 import { HiX, HiDownload, HiShare, HiStar, HiExternalLink } from 'react-icons/hi'
 import { closeModal } from '../../store/slices/uiSlice'
 import { downloadFile } from '../../services/api'
 import { getFileIcon, formatFileSize } from '../../utils/fileUtils'
+import toast from 'react-hot-toast'
 
 const FilePreviewModal = () => {
   const dispatch = useDispatch()
   const { modalData: file } = useSelector(state => state.ui)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const mime = file?.mimeType || ''
+  const canPreview = mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime.startsWith('text/') || mime === 'application/pdf'
+
+  useEffect(() => {
+    let objectUrl = ''
+    let cancelled = false
+    if (!file?._id || !canPreview) return undefined
+    setPreviewLoading(true)
+    downloadFile(file._id)
+      .then(res => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(new Blob([res.data], { type: file.mimeType }))
+        setPreviewUrl(objectUrl)
+      })
+      .catch(() => toast.error('Preview could not be loaded'))
+      .finally(() => !cancelled && setPreviewLoading(false))
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [file?._id, file?.mimeType, canPreview])
 
   if (!file) return null
 
   const Icon = getFileIcon(file.mimeType)
 
   const renderPreview = () => {
-    const mime = file.mimeType || ''
+    if (previewLoading) return <div className="h-9 w-9 rounded-full border-4 border-primary-500 border-t-transparent animate-spin" />
 
-    if (mime.startsWith('image/') && file.webViewLink) {
+    if (mime.startsWith('image/') && previewUrl) {
       return (
         <img
-          src={file.thumbnail || file.webViewLink}
+          src={previewUrl}
           alt={file.name}
           className="max-w-full max-h-[60vh] object-contain rounded-xl"
         />
       )
     }
 
-    if (mime.startsWith('video/') && file.webViewLink) {
-      return (
-        <div className="text-center space-y-4">
-          <Icon className="text-6xl text-blue-500 mx-auto" />
-          <a href={file.webViewLink} target="_blank" rel="noreferrer" className="btn-primary inline-flex items-center gap-2">
-            <HiExternalLink /> Open Video in Google Drive
-          </a>
-        </div>
-      )
+    if (mime.startsWith('video/') && previewUrl) {
+      return <video src={previewUrl} controls className="max-w-full max-h-[60vh] rounded-xl" />
     }
 
-    if (mime === 'application/pdf' && file.webViewLink) {
-      return (
-        <div className="text-center space-y-4">
-          <Icon className="text-6xl text-red-500 mx-auto" />
-          <a href={file.webViewLink} target="_blank" rel="noreferrer" className="btn-primary inline-flex items-center gap-2">
-            <HiExternalLink /> Open PDF in Google Drive
-          </a>
-          {file.ocrText && (
-            <div className="text-left mt-4 p-4 bg-slate-50 dark:bg-dark-800 rounded-xl max-h-40 overflow-y-auto text-xs text-dark-600 dark:text-dark-300">
-              <p className="font-semibold mb-2">Extracted Text:</p>
-              {file.ocrText.substring(0, 500)}...
-            </div>
-          )}
-        </div>
-      )
+    if (mime.startsWith('audio/') && previewUrl) {
+      return <audio src={previewUrl} controls className="w-full max-w-lg" />
+    }
+
+    if ((mime === 'application/pdf' || mime.startsWith('text/')) && previewUrl) {
+      return <iframe src={previewUrl} title={file.name} className="w-full h-[60vh] rounded-xl border border-slate-200 bg-white" />
     }
 
     return (

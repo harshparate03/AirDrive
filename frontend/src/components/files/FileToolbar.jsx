@@ -8,10 +8,12 @@ import {
 import { clearSelection, openModal } from '../../store/slices/uiSlice'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../ui/ConfirmDialog'
 
 const FileToolbar = ({ onRefresh }) => {
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const { selectedFiles } = useSelector(state => state.ui)
   const count = selectedFiles.length
 
@@ -94,8 +96,8 @@ const FileToolbar = ({ onRefresh }) => {
     },
     {
       icon: HiTrash, label: 'Delete',
-      onClick: () => {
-        if (window.confirm(`Move ${count} file(s) to trash?`)) bulkTrash.mutate()
+      onClick: async () => {
+        if (await confirm({ title: 'Move files to trash?', message: `${count} selected file(s) will be moved to trash.`, confirmLabel: 'Move to trash' })) bulkTrash.mutate()
       },
       loading: bulkTrash.isPending,
       className: 'text-red-500',

@@ -9,6 +9,7 @@ import {
 import { setContextMenu, openModal } from '../../store/slices/uiSlice'
 import api, { downloadFile } from '../../services/api'
 import toast from 'react-hot-toast'
+import { useConfirm } from './ConfirmDialog'
 
 const ContextMenu = () => {
   const dispatch = useDispatch()
@@ -16,6 +17,7 @@ const ContextMenu = () => {
   const { contextMenu } = useSelector(state => state.ui)
   const menuRef = useRef(null)
   const [suggestedName, setSuggestedName] = useState('')
+  const confirm = useConfirm()
 
   if (!contextMenu) return null
 
@@ -157,8 +159,8 @@ const aiRename = useMutation({
     { divider: true },
     {
       icon: HiTrash, label: 'Delete Folder',
-      action: () => {
-        if (window.confirm(`Delete "${folder.name}"?`)) {
+      action: async () => {
+        if (await confirm({ title: 'Delete folder?', message: `"${folder.name}" and its contents will be moved to trash.`, confirmLabel: 'Delete folder' })) {
           api.delete(`/folders/${folder._id}`)
             .then(() => { queryClient.invalidateQueries({ queryKey: ['folders'] }); toast.success('Folder deleted') })
             .catch(() => toast.error('Delete failed'))

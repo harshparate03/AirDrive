@@ -67,7 +67,7 @@ const FolderPage = () => {
             <button onClick={() => setShowCreateFolder(true)} className="btn-secondary text-sm flex items-center gap-2">
               <HiFolderAdd /> New Folder
             </button>
-            <button onClick={() => dispatch(openModal({ modal: 'upload' }))} className="btn-primary text-sm flex items-center gap-2">
+            <button onClick={() => dispatch(openModal({ modal: 'upload', data: { folderId } }))} className="btn-primary text-sm flex items-center gap-2">
               <HiUpload /> Upload
             </button>
           </div>

@@ -39,8 +39,9 @@ router.post('/', authenticate, async (req, res) => {
     // Build path
     let pathArr = [];
     if (parentFolder) {
-      const parent = await Folder.findById(parentFolder);
-      if (parent) pathArr = [...(parent.path || []), parent._id];
+      const parent = await Folder.findOne({ _id: parentFolder, userId: req.user._id, trashed: false });
+      if (!parent) return res.status(404).json({ error: 'Parent folder not found' });
+      pathArr = [...(parent.path || []), parent._id];
     }
 
     const folder = await Folder.create({
@@ -117,7 +118,8 @@ router.get('/:id/contents', authenticate, async (req, res) => {
       Folder.find({ parentFolder: req.params.id, userId: req.user._id, trashed: false }).lean(),
       File.find({ folderId: req.params.id, userId: req.user._id, trashed: false }).lean(),
     ]);
-    const folder = await Folder.findById(req.params.id).populate('path').lean();
+    const folder = await Folder.findOne({ _id: req.params.id, userId: req.user._id, trashed: false }).populate('path').lean();
+    if (!folder) return res.status(404).json({ error: 'Folder not found' });
     res.json({ folder, folders, files });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch folder contents' });
