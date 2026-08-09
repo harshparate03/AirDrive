@@ -5,6 +5,7 @@ import { HiX, HiDownload, HiShare, HiStar, HiExternalLink } from 'react-icons/hi
 import { closeModal } from '../../store/slices/uiSlice'
 import api, { downloadFile } from '../../services/api'
 import { getFileIcon, formatFileSize } from '../../utils/fileUtils'
+import { openFileResponse, saveFileResponse } from '../../utils/fileActions'
 import toast from 'react-hot-toast'
 
 const FilePreviewModal = () => {
@@ -85,24 +86,35 @@ const FilePreviewModal = () => {
         <Icon className="text-8xl mx-auto text-dark-300" />
         <p className="text-dark-500 text-sm">{canPreviewType && !canPreview ? 'This large file opens with its storage viewer.' : 'This format opens with Google Drive or downloads to your device.'}</p>
         <div className="flex flex-wrap justify-center gap-2">
-          {(previewInfo?.webViewLink || file.webViewLink) && (
-            <a href={previewInfo?.webViewLink || file.webViewLink} target="_blank" rel="noreferrer" className="btn-primary inline-flex items-center gap-2">
-              <HiExternalLink /> Open File
-            </a>
-          )}
+          <button onClick={handleOpen} className="btn-primary inline-flex items-center gap-2"><HiExternalLink /> Open File</button>
           <button onClick={handleDownload} className="btn-secondary inline-flex items-center gap-2"><HiDownload /> Download File</button>
         </div>
       </div>
     )
   }
 
+  const handleOpen = async () => {
+    const viewerLink = previewInfo?.webViewLink || file.webViewLink
+    if (viewerLink) {
+      window.open(viewerLink, '_blank', 'noopener,noreferrer')
+      return
+    }
+
+    const popup = window.open('', '_blank')
+    try {
+      if (popup) popup.document.body.textContent = 'Opening file...'
+      const response = await downloadFile(file._id)
+      openFileResponse(response, popup, file.name)
+    } catch {
+      popup?.close()
+      toast.error('File data is unavailable. Re-upload this file to restore it.')
+    }
+  }
+
   const handleDownload = async () => {
     try {
       const res = await downloadFile(file._id)
-      const url = URL.createObjectURL(new Blob([res.data]))
-      const a = document.createElement('a')
-      a.href = url; a.download = file.name; a.click()
-      URL.revokeObjectURL(url)
+      saveFileResponse(res, file.name)
     } catch { toast.error('File could not be downloaded. Re-upload it if it was stored before persistent Drive storage was enabled.') }
   }
 

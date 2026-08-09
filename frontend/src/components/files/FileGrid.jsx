@@ -9,6 +9,7 @@ import {
 import api, { downloadFile } from '../../services/api'
 import { openModal, toggleFileSelection, setContextMenu } from '../../store/slices/uiSlice'
 import { getFileIcon, getFileColor, formatFileSize } from '../../utils/fileUtils'
+import { saveFileResponse } from '../../utils/fileActions'
 import toast from 'react-hot-toast'
 import FileContextMenu from './FileContextMenu'
 import { useConfirm } from '../ui/ConfirmDialog'
@@ -57,12 +58,7 @@ const FileCard = ({ file, onRefresh, showRestore }) => {
   const handleDownload = async () => {
     try {
       const res = await downloadFile(file._id)
-      const url = URL.createObjectURL(new Blob([res.data]))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = file.name
-      a.click()
-      URL.revokeObjectURL(url)
+      saveFileResponse(res, file.name)
     } catch {
       // Fallback to webContentLink
       if (file.webContentLink) window.open(file.webContentLink)
