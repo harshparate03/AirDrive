@@ -34,7 +34,17 @@ const SharedFilePage = () => {
   const notFound = error?.response?.status === 404
 
   const shareLink = data?.shareLink
-  const content = data?.content
+  const rawContent = data?.content
+  // Support both the legacy API shape (`content` is the file/folder itself)
+  // and the current shape (`content.file` / `content.folder`). This keeps
+  // public links working while frontend and backend deployments roll out.
+  const content = rawContent?.file || rawContent?.folder
+    ? rawContent
+    : rawContent?.mimeType || rawContent?.originalName || rawContent?.googleFileId !== undefined
+      ? { type: 'file', file: rawContent }
+      : rawContent?._id
+        ? { type: 'folder', folder: rawContent, files: data?.files || [], folders: data?.folders || [] }
+        : null
 
   useEffect(() => {
     let objectUrl = ''
