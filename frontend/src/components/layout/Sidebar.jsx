@@ -6,6 +6,7 @@ import {
   HiHome, HiFolder, HiShare, HiClock, HiStar, HiTrash,
   HiSparkles, HiChartBar, HiCog, HiLogout, HiChevronLeft,
   HiCloudUpload, HiUpload,
+  HiShieldCheck,
 } from 'react-icons/hi'
 import { logoutUser } from '../../store/slices/authSlice'
 import { toggleSidebarCollapse, openModal } from '../../store/slices/uiSlice'
@@ -122,6 +123,21 @@ const Sidebar = () => {
               </NavLink>
             )
           })}
+          {user?.role === 'admin' && (
+            <>
+              <div className="my-2 border-t border-slate-100 dark:border-dark-800" />
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `sidebar-link ${isActive ? 'active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`
+                }
+                title="Admin Panel"
+              >
+                <HiShieldCheck className="text-xl flex-shrink-0" />
+                {!sidebarCollapsed && <span className="text-sm sidebar-label">Admin Panel</span>}
+              </NavLink>
+            </>
+          )}
         </nav>
 
         {/* Storage */}
