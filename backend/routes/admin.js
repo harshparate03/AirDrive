@@ -6,6 +6,10 @@ const File = require('../models/File');
 const Activity = require('../models/Activity');
 const AIHistory = require('../models/AIHistory');
 const Notification = require('../models/Notification');
+const Folder = require('../models/Folder');
+const SharedLink = require('../models/SharedLink');
+const FileRequest = require('../models/FileRequest');
+const mongoose = require('mongoose');
 const { generateAccessToken } = require('../utils/jwt');
 const { logActivity } = require('../utils/activityLogger');
 
@@ -42,10 +46,15 @@ router.get('/dashboard', async (req, res) => {
     const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
     const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
-    const [totalUsers, activeUsers, totalFiles, recentActivities, aiUsage, recentLogins, recentSignups, activityTrends, activityBreakdown] = await Promise.all([
+    const [totalUsers, activeUsers, totalFiles, totalFolders, trashedFiles, activeShares, fileRequests, totalStorageResult, recentActivities, aiUsage, recentLogins, recentSignups, activityTrends, activityBreakdown] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ lastLoginAt: { $gte: dayAgo } }),
       File.countDocuments({ trashed: false }),
+      Folder.countDocuments({ trashed: false }),
+      File.countDocuments({ trashed: true }),
+      SharedLink.countDocuments({ isActive: true }),
+      FileRequest.countDocuments(),
+      File.aggregate([{ $match: { trashed: false } }, { $group: { _id: null, total: { $sum: '$size' } } }]),
       Activity.find().sort({ createdAt: -1 }).limit(20).populate('userId', 'name email').lean(),
       AIHistory.aggregate([
         { $match: { createdAt: { $gte: monthAgo } } },
@@ -91,7 +100,7 @@ router.get('/dashboard', async (req, res) => {
       0
     );
 
-    res.json({ totalUsers, activeUsers, totalFiles, recentActivities, aiUsage, storageStats, userGrowth, recentLogins, recentSignups, activityTrends, activityBreakdown, totalInteractions30d, shareInteractions30d });
+    res.json({ totalUsers, activeUsers, totalFiles, totalFolders, trashedFiles, activeShares, fileRequests, totalStorage: totalStorageResult[0]?.total || 0, recentActivities, aiUsage, storageStats, userGrowth, recentLogins, recentSignups, activityTrends, activityBreakdown, totalInteractions30d, shareInteractions30d });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch admin dashboard' });
   }
@@ -224,7 +233,7 @@ router.get('/users', async (req, res) => {
 // PATCH /api/admin/users/:id - Manage user
 router.patch('/users/:id', async (req, res) => {
   try {
-    const { role, isActive } = req.body;
+    const { role, isActive, storageLimit, name } = req.body;
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (role && !['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
@@ -234,12 +243,142 @@ router.patch('/users/:id', async (req, res) => {
 
     if (role) user.role = role;
     if (isActive !== undefined) user.isActive = isActive;
+    if (name?.trim()) user.name = name.trim();
+    if (storageLimit !== undefined) {
+      const parsedLimit = Number(storageLimit);
+      if (!Number.isFinite(parsedLimit) || parsedLimit < 0) return res.status(400).json({ error: 'Invalid storage limit' });
+      user.storageLimit = parsedLimit;
+    }
     await user.save();
 
     res.json({ user: user.toPublic() });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update user' });
   }
+});
+
+// POST /api/admin/users - Provision a user or administrator
+router.post('/users', async (req, res) => {
+  try {
+    const { name, email, password, role = 'user', storageLimit } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (!['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+    const user = new User({ name: name.trim(), email: email.toLowerCase().trim(), password, role });
+    if (storageLimit !== undefined) user.storageLimit = Number(storageLimit);
+    await user.save();
+    res.status(201).json({ user: user.toPublic() });
+  } catch (error) {
+    if (error.code === 11000) return res.status(409).json({ error: 'Email already exists' });
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// DELETE /api/admin/users/:id - Safe account removal (suspends access and sessions)
+router.delete('/users/:id', async (req, res) => {
+  try {
+    if (req.user._id.equals(req.params.id)) return res.status(400).json({ error: 'You cannot remove your own account' });
+    const user = await User.findByIdAndUpdate(req.params.id, { isActive: false, refreshToken: '' }, { new: true });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ message: 'Account suspended and sessions revoked' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to remove user access' });
+  }
+});
+
+// GET /api/admin/resources/:type - Platform-wide operational inventories
+router.get('/resources/:type', async (req, res) => {
+  try {
+    const { type } = req.params;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200);
+    let items;
+    if (type === 'files' || type === 'trash') {
+      items = await File.find({ trashed: type === 'trash' }).sort({ createdAt: -1 }).limit(limit)
+        .populate('userId', 'name email').populate('folderId', 'name').lean();
+    } else if (type === 'folders') {
+      items = await Folder.find().sort({ createdAt: -1 }).limit(limit).populate('userId', 'name email').lean();
+    } else if (type === 'shares') {
+      items = await SharedLink.find().sort({ createdAt: -1 }).limit(limit).populate('userId', 'name email')
+        .populate('fileId', 'name size').populate('folderId', 'name').select('-password -qrCode').lean();
+    } else if (type === 'requests') {
+      items = await FileRequest.find().sort({ createdAt: -1 }).limit(limit).populate('userId', 'name email').lean();
+    } else if (type === 'ai') {
+      items = await AIHistory.find().sort({ createdAt: -1 }).limit(limit).populate('userId', 'name email')
+        .populate('fileId', 'name').select('-prompt -response').lean();
+    } else if (type === 'storage') {
+      items = await User.find().sort({ storageUsed: -1 }).limit(limit)
+        .select('name email storageUsed storageLimit isActive role').lean();
+    } else {
+      return res.status(400).json({ error: 'Unknown resource type' });
+    }
+    res.json({ items });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load admin resources' });
+  }
+});
+
+router.patch('/files/:id', async (req, res) => {
+  try {
+    const { action } = req.body;
+    if (!['trash', 'restore'].includes(action)) return res.status(400).json({ error: 'Invalid file action' });
+    const trashed = action === 'trash';
+    const file = await File.findByIdAndUpdate(req.params.id, { trashed, trashedAt: trashed ? new Date() : null }, { new: true });
+    if (!file) return res.status(404).json({ error: 'File not found' });
+    res.json({ file });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update file' });
+  }
+});
+
+router.patch('/shares/:id', async (req, res) => {
+  try {
+    const share = await SharedLink.findByIdAndUpdate(req.params.id, { isActive: Boolean(req.body.isActive) }, { new: true });
+    if (!share) return res.status(404).json({ error: 'Share not found' });
+    res.json({ share });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update share' });
+  }
+});
+
+router.patch('/requests/:id', async (req, res) => {
+  try {
+    const request = await FileRequest.findByIdAndUpdate(req.params.id, { isActive: Boolean(req.body.isActive) }, { new: true });
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+    res.json({ request });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update request' });
+  }
+});
+
+// GET /api/admin/security - Account and authentication risk overview
+router.get('/security', async (req, res) => {
+  try {
+    const now = new Date();
+    const [lockedAccounts, accountsWithFailures, recentLogins] = await Promise.all([
+      User.countDocuments({ lockUntil: { $gt: now } }),
+      User.countDocuments({ loginAttempts: { $gt: 0 } }),
+      Activity.find({ action: 'login' }).sort({ createdAt: -1 }).limit(50).populate('userId', 'name email role').lean(),
+    ]);
+    res.json({ lockedAccounts, accountsWithFailures, recentLogins });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load security status' });
+  }
+});
+
+// GET /api/admin/health - Live dependency/configuration status without exposing secrets
+router.get('/health', async (req, res) => {
+  const databaseConnected = mongoose.connection.readyState === 1;
+  res.json({
+    checkedAt: new Date().toISOString(),
+    services: [
+      { name: 'API', status: 'operational', detail: 'Express API responding' },
+      { name: 'Database', status: databaseConnected ? 'operational' : 'degraded', detail: databaseConnected ? 'MongoDB connected' : 'MongoDB disconnected' },
+      { name: 'Authentication', status: process.env.JWT_SECRET ? 'operational' : 'degraded', detail: process.env.JWT_SECRET ? 'JWT configured' : 'JWT configuration missing' },
+      { name: 'Email', status: process.env.EMAIL_USER && process.env.EMAIL_PASS ? 'operational' : 'not_configured', detail: 'SMTP configuration' },
+      { name: 'AI', status: process.env.OPENAI_API_KEY ? 'operational' : 'not_configured', detail: 'AI provider configuration' },
+      { name: 'Storage', status: 'operational', detail: 'Local and connected Drive storage supported' },
+    ],
+  });
 });
 
 // POST /api/admin/announcements - Send announcement to all users
