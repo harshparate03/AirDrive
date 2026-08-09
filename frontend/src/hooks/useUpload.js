@@ -17,11 +17,13 @@ const useUpload = (folderId = null) => {
     const formData = new FormData()
     formData.append('files', file)
     if (folderId) formData.append('folderId', folderId)
+    if (file.webkitRelativePath) formData.append('relativePath', file.webkitRelativePath)
 
     try {
       await uploadFiles(formData, (progress) => {
         // Per-file progress (each file is uploaded in its own request)
-        dispatch(updateProgress({ id, progress }))
+        // Reserve the final 5% for server-side storage/database processing.
+        dispatch(updateProgress({ id, progress: Math.min(progress, 95) }))
       })
       dispatch(setUploadStatus({ id, status: 'completed' }))
       return true

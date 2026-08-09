@@ -50,6 +50,7 @@ const AIAssistantPage = () => {
   const [smartSearchQuery, setSmartSearchQuery] = useState('')
   const [smartResults, setSmartResults] = useState(null)
   const [summaryType, setSummaryType] = useState('summary')
+  const [folderSuggestions, setFolderSuggestions] = useState([])
   const messagesEndRef = useRef(null)
 
   const { data: filesData } = useQuery({
@@ -111,6 +112,12 @@ const AIAssistantPage = () => {
     mutationFn: (query) => api.post('/ai/smart-search', { query }),
     onSuccess: (res) => setSmartResults(res.data.files),
     onError: () => toast.error('Smart search failed'),
+  })
+
+  const folderMutation = useMutation({
+    mutationFn: (fileIds) => api.post('/ai/folder-suggestion', { fileIds }),
+    onSuccess: (res) => setFolderSuggestions(res.data.suggestions || []),
+    onError: () => toast.error('Folder suggestion failed'),
   })
 
   useEffect(() => {
@@ -361,6 +368,22 @@ const AIAssistantPage = () => {
                 >
                   <HiDuplicate /> {duplicatesMutation.isPending ? 'Scanning...' : 'Find Duplicates'}
                 </button>
+                {duplicatesMutation.data && (
+                  <div className="space-y-3 pt-3">
+                    {duplicatesMutation.data.data.exactDuplicates.map((group, index) => (
+                      <div key={`exact-${index}`} className="rounded-xl bg-slate-50 dark:bg-dark-800 p-3">
+                        <p className="text-xs font-semibold text-red-500">Exact-size match</p>
+                        {group.map(file => <p key={file._id} className="mt-1 text-sm text-dark-700 dark:text-dark-200">{file.name}</p>)}
+                      </div>
+                    ))}
+                    {duplicatesMutation.data.data.similarNames.map((group, index) => (
+                      <div key={`name-${index}`} className="rounded-xl bg-slate-50 dark:bg-dark-800 p-3 text-sm text-dark-700 dark:text-dark-200">
+                        {group.map(file => file.name).join(' ↔ ')}
+                      </div>
+                    ))}
+                    {duplicatesMutation.data.data.exactDuplicates.length === 0 && duplicatesMutation.data.data.similarNames.length === 0 && <p className="text-sm text-green-600">No duplicates found.</p>}
+                  </div>
+                )}
               </div>
             )}
             {activeFeature === 'folders' && (
@@ -369,14 +392,20 @@ const AIAssistantPage = () => {
                 <button
                   onClick={() => {
                     const ids = filesData?.files?.slice(0, 20).map(f => f._id) || []
-                    api.post('/ai/folder-suggestion', { fileIds: ids })
-                      .then(r => toast.success('Folder suggestions generated!'))
-                      .catch(() => toast.error('Suggestion failed'))
+                    folderMutation.mutate(ids)
                   }}
+                  disabled={folderMutation.isPending}
                   className="btn-primary flex items-center gap-2"
                 >
                   <HiFolder /> Generate Folder Suggestions
                 </button>
+                {folderSuggestions.map((suggestion, index) => (
+                  <div key={`${suggestion.folder}-${index}`} className="rounded-xl border border-slate-200 dark:border-dark-700 p-4">
+                    <p className="font-semibold text-dark-800 dark:text-white">{suggestion.folder}</p>
+                    <p className="mt-1 text-xs text-dark-400">{suggestion.reason}</p>
+                    <p className="mt-2 text-sm text-dark-600 dark:text-dark-300">{suggestion.files?.join(', ')}</p>
+                  </div>
+                ))}
               </div>
             )}
           </div>

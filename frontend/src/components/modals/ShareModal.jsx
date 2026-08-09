@@ -9,23 +9,26 @@ import toast from 'react-hot-toast'
 
 const ShareModal = () => {
   const dispatch = useDispatch()
-  const { modalData: file } = useSelector(s => s.ui)
-  const [permission, setPermission] = useState('viewer')
+  const { modalData: item } = useSelector(s => s.ui)
+  const isFolder = item?.type === 'folder'
+  const permission = 'viewer'
   const [password, setPassword] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [downloadDisabled, setDownloadDisabled] = useState(false)
   const [email, setEmail] = useState('')
+  const [allowedEmails, setAllowedEmails] = useState('')
   const [createdLink, setCreatedLink] = useState(null)
   const [copied, setCopied] = useState(false)
   const [tab, setTab] = useState('link') // link | email | qr
 
   const createMutation = useMutation({
     mutationFn: () => api.post('/share', {
-      fileId: file?._id,
+      ...(isFolder ? { folderId: item?._id } : { fileId: item?._id }),
       permission,
       password: password || undefined,
       expiresAt: expiresAt || undefined,
       downloadDisabled,
+      allowedEmails: allowedEmails.split(',').map(value => value.trim()).filter(Boolean),
     }),
     onSuccess: (res) => {
       setCreatedLink(res.data)
@@ -37,9 +40,7 @@ const ShareModal = () => {
   const emailMutation = useMutation({
     mutationFn: () => api.post('/share/email', {
       email,
-      shareUrl: `${window.location.origin}/share/${createdLink?.shareLink?.token}`,
-      fileName: file?.name,
-      permission,
+      shareLinkId: createdLink?.shareLink?._id,
     }),
     onSuccess: () => { toast.success(`Invitation sent to ${email}`); setEmail('') },
     onError: () => toast.error('Failed to send email'),
@@ -68,7 +69,7 @@ const ShareModal = () => {
           <HiShare className="text-primary-500 text-xl" />
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-dark-800 dark:text-dark-100">Share File</h2>
-            <p className="text-xs text-dark-400 truncate">{file?.name}</p>
+            <p className="text-xs text-dark-400 truncate">{item?.name}</p>
           </div>
           <button onClick={() => dispatch(closeModal())} className="btn-ghost p-1.5"><HiX /></button>
         </div>
@@ -77,21 +78,12 @@ const ShareModal = () => {
           {/* Permission */}
           <div>
             <label className="block text-sm font-medium text-dark-600 dark:text-dark-300 mb-2">Access Level</label>
-            <div className="grid grid-cols-3 gap-2">
-              {['viewer', 'commenter', 'editor'].map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPermission(p)}
-                  className={`py-2 px-3 rounded-xl text-sm font-medium border transition-all capitalize ${
-                    permission === p
-                      ? 'bg-primary-600 text-white border-primary-600'
-                      : 'border-slate-200 dark:border-dark-600 text-dark-600 dark:text-dark-300 hover:border-primary-300'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+            <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700 dark:border-primary-700/50 dark:bg-primary-900/20 dark:text-primary-300">Viewer access</div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-dark-500 mb-1">Restrict to emails (optional, comma separated)</label>
+            <input value={allowedEmails} onChange={e => setAllowedEmails(e.target.value)} placeholder="person@example.com" className="input text-sm py-2" />
           </div>
 
           {/* Options */}

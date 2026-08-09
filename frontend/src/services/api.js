@@ -80,6 +80,11 @@ export const sharePreviewUrl = (token, password) => {
   return `${API_URL}/share/${token}/preview${qs ? `?${qs}` : ''}`
 }
 
+export const sharePreview = (token, password) => api.get(`/share/${token}/preview`, {
+  params: { password },
+  responseType: 'blob',
+})
+
 // Download a shared file through the proxy (respects downloadDisabled)
 export const shareDownload = (token, password) => {
   return api.get(`/share/${token}/download`, {

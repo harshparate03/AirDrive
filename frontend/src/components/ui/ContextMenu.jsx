@@ -149,6 +149,10 @@ const aiRename = useMutation({
       action: () => { dispatch(openModal({ modal: 'rename', data: { ...folder, type: 'folder' } })); close() },
     },
     {
+      icon: HiShare, label: 'Share',
+      action: () => { dispatch(openModal({ modal: 'share', data: { ...folder, type: 'folder' } })); close() },
+    },
+    {
       icon: HiStar, label: folder?.starred ? 'Unstar' : 'Star',
       action: () => {
         api.patch(`/folders/${folder._id}`, { starred: !folder.starred })

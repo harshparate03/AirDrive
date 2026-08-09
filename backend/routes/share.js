@@ -23,9 +23,17 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const { fileId, folderId, permission = 'viewer', password, expiresAt, downloadDisabled = false, allowedEmails = [] } = req.body;
 
-    if (!fileId && !folderId) {
-      return res.status(400).json({ error: 'fileId or folderId required' });
+    if ((!fileId && !folderId) || (fileId && folderId)) {
+      return res.status(400).json({ error: 'Provide exactly one fileId or folderId' });
     }
+    if (permission !== 'viewer') {
+      return res.status(400).json({ error: 'Only viewer links are currently supported' });
+    }
+
+    const ownedItem = fileId
+      ? await File.findOne({ _id: fileId, userId: req.user._id, trashed: false }).select('_id')
+      : await Folder.findOne({ _id: folderId, userId: req.user._id, trashed: false }).select('_id');
+    if (!ownedItem) return res.status(404).json({ error: 'File or folder not found' });
 
     const token = uuidv4().replace(/-/g, '');
     const shareUrl = `${process.env.CLIENT_URL}/share/${token}`;
@@ -41,7 +49,9 @@ router.post('/', authenticate, async (req, res) => {
       password: password ? hashPassword(password) : null,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
       downloadDisabled,
-      allowedEmails,
+      allowedEmails: Array.isArray(allowedEmails)
+        ? [...new Set(allowedEmails.map(email => String(email).trim().toLowerCase()).filter(Boolean))]
+        : [],
       qrCode,
     });
 
@@ -88,7 +98,8 @@ router.get('/:token', optionalAuth, async (req, res) => {
 
 // Email whitelist check
     if (shareLink.allowedEmails.length > 0) {
-      if (!req.user || !shareLink.allowedEmails.includes(req.user.email)) {
+      const email = req.user?.email?.toLowerCase();
+      if (!email || !shareLink.allowedEmails.map(item => item.toLowerCase()).includes(email)) {
         return res.status(403).json({ error: 'Access restricted to specific users' });
       }
     }
@@ -112,12 +123,17 @@ router.get('/:token', optionalAuth, async (req, res) => {
 
     let content = null;
     if (shareLink.fileId) {
-      content = await File.findById(shareLink.fileId).lean();
+      const file = await File.findOne({ _id: shareLink.fileId, userId: shareLink.userId, trashed: false }).lean();
+      content = file ? { type: 'file', file } : null;
     } else if (shareLink.folderId) {
-      const folder = await Folder.findById(shareLink.folderId).lean();
-      const files = await File.find({ folderId: shareLink.folderId, trashed: false }).lean();
-      content = { folder, files };
+      const folder = await Folder.findOne({ _id: shareLink.folderId, userId: shareLink.userId, trashed: false }).lean();
+      const [files, folders] = await Promise.all([
+        File.find({ folderId: shareLink.folderId, userId: shareLink.userId, trashed: false }).lean(),
+        Folder.find({ parentFolder: shareLink.folderId, userId: shareLink.userId, trashed: false }).lean(),
+      ]);
+      content = folder ? { type: 'folder', folder, files, folders } : null;
     }
+    if (!content) return res.status(404).json({ error: 'Shared item no longer exists' });
 
     // Notify owner that the share was accessed
     try {
@@ -138,12 +154,18 @@ router.get('/:token', optionalAuth, async (req, res) => {
 });
 
 // Helper to resolve + authorize a share link
-const resolveShare = async (token, password) => {
+const resolveShare = async (token, password, user) => {
   const shareLink = await SharedLink.findOne({ token, isActive: true });
   if (!shareLink) return { error: { status: 404, message: 'Share link not found or expired' } };
   if (shareLink.isExpired()) return { error: { status: 410, message: 'Share link has expired' } };
   if (shareLink.password && shareLink.password !== hashPassword(password || '')) {
     return { error: { status: 401, message: 'Incorrect password' } };
+  }
+  if (shareLink.allowedEmails.length > 0) {
+    const email = user?.email?.toLowerCase();
+    if (!email || !shareLink.allowedEmails.map(item => item.toLowerCase()).includes(email)) {
+      return { error: { status: 403, message: 'Access restricted to specific users' } };
+    }
   }
   return { shareLink };
 };
@@ -152,11 +174,11 @@ const resolveShare = async (token, password) => {
 router.get('/:token/preview', optionalAuth, async (req, res) => {
   try {
     const { password } = req.query;
-    const { shareLink, error } = await resolveShare(req.params.token, password);
+    const { shareLink, error } = await resolveShare(req.params.token, password, req.user);
     if (error) return res.status(error.status).json({ error: error.message });
     if (!shareLink.fileId) return res.status(400).json({ error: 'Preview only available for files' });
 
-    const file = await File.findById(shareLink.fileId);
+    const file = await File.findOne({ _id: shareLink.fileId, userId: shareLink.userId, trashed: false });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     res.setHeader('Content-Type', file.mimeType);
@@ -182,12 +204,12 @@ router.get('/:token/preview', optionalAuth, async (req, res) => {
 router.get('/:token/download', optionalAuth, async (req, res) => {
   try {
     const { password } = req.query;
-    const { shareLink, error } = await resolveShare(req.params.token, password);
+    const { shareLink, error } = await resolveShare(req.params.token, password, req.user);
     if (error) return res.status(error.status).json({ error: error.message });
     if (shareLink.downloadDisabled) return res.status(403).json({ error: 'Download is disabled for this share link' });
     if (!shareLink.fileId) return res.status(400).json({ error: 'Download only available for files' });
 
-    const file = await File.findById(shareLink.fileId);
+    const file = await File.findOne({ _id: shareLink.fileId, userId: shareLink.userId, trashed: false });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     res.setHeader('Content-Type', file.mimeType);
@@ -240,7 +262,16 @@ router.get('/', authenticate, async (req, res) => {
 // POST /api/share/email - Send share via email
 router.post('/email', authenticate, async (req, res) => {
   try {
-    const { email, shareUrl, fileName, permission } = req.body;
+    const { email, shareLinkId } = req.body;
+    if (!email || !shareLinkId) return res.status(400).json({ error: 'Email and shareLinkId are required' });
+    const shareLink = await SharedLink.findOne({ _id: shareLinkId, userId: req.user._id, isActive: true })
+      .populate('fileId', 'name')
+      .populate('folderId', 'name');
+    if (!shareLink) return res.status(404).json({ error: 'Share link not found' });
+    const shareUrl = `${process.env.CLIENT_URL}/share/${shareLink.token}`;
+    const fileName = shareLink.fileId?.name || shareLink.folderId?.name || 'Shared item';
+    const permission = shareLink.permission;
+    const safeName = String(fileName).replace(/[<>&"']/g, '');
     const nodemailer = require('nodemailer');
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
@@ -255,12 +286,12 @@ router.post('/email', authenticate, async (req, res) => {
     await transporter.sendMail({
       from: `"Air Drive" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: `${req.user.name} shared "${fileName}" with you`,
+      subject: `${req.user.name} shared "${safeName}" with you`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #6366f1;">Air Drive</h2>
           <p><strong>${req.user.name}</strong> (${req.user.email}) has shared a file with you.</p>
-          <p><strong>File:</strong> ${fileName}</p>
+          <p><strong>Item:</strong> ${safeName}</p>
           <p><strong>Access:</strong> ${permission}</p>
           <a href="${shareUrl}" style="display:inline-block;padding:12px 24px;background:#6366f1;color:#fff;text-decoration:none;border-radius:8px;">
             Open File

@@ -38,19 +38,31 @@ router.post('/', authenticate, async (req, res) => {
 
     // Build path
     let pathArr = [];
+    let parent = null;
     if (parentFolder) {
-      const parent = await Folder.findOne({ _id: parentFolder, userId: req.user._id, trashed: false });
+      parent = await Folder.findOne({ _id: parentFolder, userId: req.user._id, trashed: false });
       if (!parent) return res.status(404).json({ error: 'Parent folder not found' });
       pathArr = [...(parent.path || []), parent._id];
     }
 
+    let googleFolderId = '';
+    if (req.user.googleConnected && req.user.googleAccessToken && req.user.googleRefreshToken) {
+      const { accessToken, refreshToken } = getTokens(req.user);
+      const driveFolder = await driveService.createDriveFolder(accessToken, refreshToken, {
+        name: name.trim(),
+        parentFolderId: parent?.googleFolderId || null,
+      });
+      googleFolderId = driveFolder.id || '';
+    }
+
     const folder = await Folder.create({
       userId: req.user._id,
-      name,
+      name: name.trim(),
       parentFolder: parentFolder || null,
       color: color || '#6366f1',
       icon: icon || 'folder',
       path: pathArr,
+      googleFolderId,
     });
 
     await logActivity({ userId: req.user._id, action: 'create_folder', folderId: folder._id, details: `Created folder: ${name}`, ...getClientInfo(req) });
@@ -89,25 +101,64 @@ router.delete('/:id', authenticate, async (req, res) => {
     const folder = await Folder.findOne({ _id: req.params.id, userId: req.user._id });
     if (!folder) return res.status(404).json({ error: 'Folder not found' });
 
+    const folderIds = [folder._id];
+    for (let index = 0; index < folderIds.length; index += 1) {
+      const children = await Folder.find({ parentFolder: folderIds[index], userId: req.user._id }).select('_id').lean();
+      folderIds.push(...children.map(child => child._id));
+    }
+
     if (permanent === 'true') {
-      // Recursively delete all children
-      const deleteRecursive = async (folderId) => {
-        const subFolders = await Folder.find({ parentFolder: folderId, userId: req.user._id });
-        for (const sub of subFolders) await deleteRecursive(sub._id);
-        await File.deleteMany({ folderId, userId: req.user._id });
-        await Folder.deleteOne({ _id: folderId });
-      };
-      await deleteRecursive(folder._id);
+      const files = await File.find({ folderId: { $in: folderIds }, userId: req.user._id });
+      const { accessToken, refreshToken } = getTokens(req.user);
+      for (const file of files) {
+        if (file.storageType === 'google' && file.googleFileId) {
+          await driveService.deleteFile(accessToken, refreshToken, file.googleFileId);
+        } else if (file.localPath) {
+          await require('../services/localStorage').deleteFile(file.localPath);
+        }
+      }
+      const removedSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
+      await File.deleteMany({ _id: { $in: files.map(file => file._id) } });
+      const foldersToDelete = await Folder.find({ _id: { $in: folderIds }, userId: req.user._id });
+      for (const item of foldersToDelete.reverse()) {
+        if (item.googleFolderId) {
+          await driveService.deleteFile(accessToken, refreshToken, item.googleFolderId).catch(() => {});
+        }
+      }
+      await Folder.deleteMany({ _id: { $in: folderIds }, userId: req.user._id });
+      if (removedSize) await require('../models/User').findByIdAndUpdate(req.user._id, { $inc: { storageUsed: -removedSize } });
     } else {
-      folder.trashed = true;
-      folder.trashedAt = new Date();
-      await folder.save();
+      const trashedAt = new Date();
+      await Promise.all([
+        Folder.updateMany({ _id: { $in: folderIds }, userId: req.user._id }, { trashed: true, trashedAt }),
+        File.updateMany({ folderId: { $in: folderIds }, userId: req.user._id }, { trashed: true, trashedAt }),
+      ]);
     }
 
     await logActivity({ userId: req.user._id, action: 'delete_folder', folderId: folder._id, details: `Deleted folder: ${folder.name}`, ...getClientInfo(req) });
     res.json({ message: 'Folder deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete folder' });
+  }
+});
+
+// POST /api/folders/:id/restore - Restore a folder tree and its files
+router.post('/:id/restore', authenticate, async (req, res) => {
+  try {
+    const folder = await Folder.findOne({ _id: req.params.id, userId: req.user._id, trashed: true });
+    if (!folder) return res.status(404).json({ error: 'Folder not found in trash' });
+    const folderIds = [folder._id];
+    for (let index = 0; index < folderIds.length; index += 1) {
+      const children = await Folder.find({ parentFolder: folderIds[index], userId: req.user._id }).select('_id').lean();
+      folderIds.push(...children.map(child => child._id));
+    }
+    await Promise.all([
+      Folder.updateMany({ _id: { $in: folderIds }, userId: req.user._id }, { trashed: false, trashedAt: null }),
+      File.updateMany({ folderId: { $in: folderIds }, userId: req.user._id }, { trashed: false, trashedAt: null }),
+    ]);
+    res.json({ message: 'Folder restored' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to restore folder' });
   }
 });
 

@@ -141,6 +141,9 @@ mongoose.connect(process.env.MONGODB_URI, {
       console.log(`🚀 Air Drive API running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
+    const { cleanupExpiredTrash } = require('./utils/trashCleanup');
+    cleanupExpiredTrash().catch(error => console.error('Trash cleanup error:', error.message));
+    setInterval(() => cleanupExpiredTrash().catch(error => console.error('Trash cleanup error:', error.message)), 6 * 60 * 60 * 1000).unref();
   })
   .catch((err) => {
     console.error('❌ MongoDB connection failed:', err.message);

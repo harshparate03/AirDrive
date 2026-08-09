@@ -1,3 +1,5 @@
+const File = require('../models/File');
+
 const setupSocketHandlers = (io) => {
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id} | User: ${socket.user?.email}`);
@@ -21,6 +23,7 @@ const setupSocketHandlers = (io) => {
 
     // Real-time collaboration events
     socket.on('file:viewing', (data) => {
+      if (!data?.fileId || !socket.rooms.has(`file:${data.fileId}`)) return;
       socket.to(`file:${data.fileId}`).emit('user:viewing', {
         userId: socket.user._id,
         userName: socket.user.name,
@@ -28,8 +31,18 @@ const setupSocketHandlers = (io) => {
       });
     });
 
-    socket.on('join:file', (fileId) => {
-      socket.join(`file:${fileId}`);
+    socket.on('join:file', async (fileId, acknowledge) => {
+      try {
+        const allowed = await File.exists({ _id: fileId, userId: socket.user._id, trashed: false });
+        if (!allowed) {
+          acknowledge?.({ ok: false, error: 'File not found' });
+          return;
+        }
+        await socket.join(`file:${fileId}`);
+        acknowledge?.({ ok: true });
+      } catch (_) {
+        acknowledge?.({ ok: false, error: 'Unable to join file' });
+      }
     });
 
     socket.on('leave:file', (fileId) => {

@@ -10,7 +10,6 @@ const sharedLinkSchema = new mongoose.Schema({
   expiresAt: { type: Date, default: null },
   downloadDisabled: { type: Boolean, default: false },
   accessCount: { type: Number, default: 0 },
-  maxAccess: { type: Number, default: null },
   allowedEmails: [{ type: String }],
   isActive: { type: Boolean, default: true },
   qrCode: { type: String, default: '' },

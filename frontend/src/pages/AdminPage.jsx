@@ -14,9 +14,12 @@ import ViewModeToggle from '../components/ui/ViewModeToggle'
 
 const AdminPage = () => {
   const { user } = useSelector(s => s.auth)
+  const { viewMode } = useSelector(s => s.ui)
   const queryClient = useQueryClient()
   const [announcement, setAnnouncement] = useState({ title: '', message: '' })
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [userSearch, setUserSearch] = useState('')
+  const [userPage, setUserPage] = useState(1)
 
   if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
 
@@ -26,8 +29,8 @@ const AdminPage = () => {
   })
 
   const { data: usersData } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: () => api.get('/admin/users').then(r => r.data),
+    queryKey: ['admin-users', userPage, userSearch],
+    queryFn: () => api.get('/admin/users', { params: { page: userPage, search: userSearch || undefined } }).then(r => r.data),
     enabled: activeTab === 'users',
   })
 
@@ -38,7 +41,7 @@ const AdminPage = () => {
   })
 
   const toggleUserMutation = useMutation({
-    mutationFn: ({ id, isActive }) => api.patch(`/admin/users/${id}`, { isActive }),
+    mutationFn: ({ id, ...changes }) => api.patch(`/admin/users/${id}`, changes),
     onSuccess: () => queryClient.invalidateQueries(['admin-users']),
   })
 
@@ -64,6 +67,7 @@ const tabs = [
           <HiShieldCheck className="text-red-500 text-lg" />
         </div>
         <h1 className="text-xl font-bold text-dark-900 dark:text-white">Admin Panel</h1>
+        <div className="ml-auto"><ViewModeToggle /></div>
       </div>
 
       {/* Tabs */}
@@ -137,11 +141,12 @@ const tabs = [
         <div className="card overflow-hidden">
           <div className="p-4 border-b border-slate-100 dark:border-dark-700 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-dark-700 dark:text-dark-200">All Users ({usersData?.total || 0})</h2>
+            <input value={userSearch} onChange={e => { setUserSearch(e.target.value); setUserPage(1) }} placeholder="Search users" className="input max-w-52 py-1.5 text-sm" />
             <button onClick={() => queryClient.invalidateQueries(['admin-users'])} className="btn-ghost p-2"><HiRefresh /></button>
           </div>
-          <div className="divide-y divide-slate-50 dark:divide-dark-700">
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-3' : 'divide-y divide-slate-50 dark:divide-dark-700'}>
             {usersData?.users?.map(u => (
-              <div key={u._id} className="flex items-center gap-4 p-4">
+              <div key={u._id} className={`flex items-center gap-4 p-4 ${viewMode === 'grid' ? 'rounded-xl border border-slate-100 dark:border-dark-700' : ''}`}>
                 <img src={u.photo || `https://ui-avatars.com/api/?name=${u.name}&background=6366f1&color=fff`} alt={u.name} className="w-8 h-8 rounded-full flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-dark-800 dark:text-dark-100">{u.name}</p>
@@ -150,6 +155,9 @@ const tabs = [
                 <span className={`badge text-xs ${u.role === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-slate-100 text-slate-600 dark:bg-dark-700 dark:text-dark-300'}`}>
                   {u.role}
                 </span>
+                <select value={u.role} onChange={e => toggleUserMutation.mutate({ id: u._id, role: e.target.value })} className="input w-auto py-1 text-xs">
+                  <option value="user">User</option><option value="admin">Admin</option>
+                </select>
                 <button
                   onClick={() => toggleUserMutation.mutate({ id: u._id, isActive: !u.isActive })}
                   className={`text-xs font-medium px-2 py-1 rounded-lg ${u.isActive ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-400'}`}
@@ -159,6 +167,13 @@ const tabs = [
               </div>
             ))}
           </div>
+          {(usersData?.total || 0) > 20 && (
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 p-3 dark:border-dark-700">
+              <button disabled={userPage === 1} onClick={() => setUserPage(page => page - 1)} className="btn-secondary text-sm">Previous</button>
+              <span className="text-xs text-dark-400">Page {userPage}</span>
+              <button disabled={userPage * 20 >= usersData.total} onClick={() => setUserPage(page => page + 1)} className="btn-secondary text-sm">Next</button>
+            </div>
+          )}
         </div>
       )}
 
