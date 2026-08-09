@@ -68,8 +68,8 @@ export const uploadFiles = (formData, onProgress) => {
   })
 }
 
-export const downloadFile = (fileId) => {
-  return api.get(`/files/${fileId}/download`, { responseType: 'blob' })
+export const downloadFile = (fileId, options = {}) => {
+  return api.get(`/files/${fileId}/download`, { responseType: 'blob', timeout: 30000, ...options })
 }
 
 // Preview a shared file (inline) without full download

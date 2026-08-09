@@ -565,6 +565,9 @@ router.get('/:id/preview-info', authenticate, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     let webViewLink = file.webViewLink || '';
+    const available = file.storageType === 'google'
+      ? Boolean(file.googleFileId)
+      : localService.fileExists(file.localPath);
     if (file.storageType === 'google' && file.googleFileId) {
       try {
         const { accessToken, refreshToken } = getTokens(req.user);
@@ -591,6 +594,7 @@ router.get('/:id/preview-info', authenticate, async (req, res) => {
         text: text.slice(0, 50000),
         webViewLink,
         canOpenExternally: Boolean(webViewLink),
+        available,
         fallback: webViewLink ? 'google-drive' : 'download',
       },
     });
@@ -605,7 +609,15 @@ router.get('/:id/download', authenticate, async (req, res) => {
     const file = await File.findOne({ _id: req.params.id, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.name)}"`);
+    if (file.storageType !== 'google' && !localService.fileExists(file.localPath)) {
+      return res.status(410).json({
+        error: 'File content is no longer available',
+        code: 'FILE_CONTENT_MISSING',
+        action: 'reupload',
+      });
+    }
+
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`);
     res.setHeader('Content-Type', file.mimeType);
 
     if (file.storageType === 'google' && file.googleFileId) {

@@ -84,11 +84,17 @@ const FilePreviewModal = () => {
     return (
       <div className="text-center space-y-3">
         <Icon className="text-8xl mx-auto text-dark-300" />
-        <p className="text-dark-500 text-sm">{canPreviewType && !canPreview ? 'This large file opens with its storage viewer.' : 'This format opens with Google Drive or downloads to your device.'}</p>
-        <div className="flex flex-wrap justify-center gap-2">
-          <button onClick={handleOpen} className="btn-primary inline-flex items-center gap-2"><HiExternalLink /> Open File</button>
-          <button onClick={handleDownload} className="btn-secondary inline-flex items-center gap-2"><HiDownload /> Download File</button>
-        </div>
+        {previewInfo?.available === false ? (
+          <p className="text-red-500 text-sm">This legacy file is no longer present in storage. Please upload it again.</p>
+        ) : (
+          <>
+            <p className="text-dark-500 text-sm">{canPreviewType && !canPreview ? 'This large file opens with its storage viewer.' : 'This format opens with Google Drive or downloads to your device.'}</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button onClick={handleOpen} className="btn-primary inline-flex items-center gap-2"><HiExternalLink /> Open File</button>
+              <button onClick={handleDownload} className="btn-secondary inline-flex items-center gap-2"><HiDownload /> Download File</button>
+            </div>
+          </>
+        )}
       </div>
     )
   }
@@ -106,8 +112,10 @@ const FilePreviewModal = () => {
       const response = await downloadFile(file._id)
       openFileResponse(response, popup, file.name)
     } catch {
-      popup?.close()
-      toast.error('File data is unavailable. Re-upload this file to restore it.')
+      if (popup && !popup.closed) {
+        popup.document.body.textContent = 'File could not be opened. Return to AirDrive and upload the file again if it is a legacy upload.'
+      }
+      toast.error('File could not be opened. The request timed out or its stored content is unavailable.')
     }
   }
 
