@@ -11,7 +11,10 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.userId).select('-googleAccessToken -googleRefreshToken -refreshToken');
+    // Google tokens are required internally by authenticated Drive routes.
+    // They remain server-only: response routes use `toPublic()` or explicit
+    // projections before returning user data to clients.
+    const user = await User.findById(decoded.userId).select('-refreshToken');
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'User not found or inactive' });
     }
