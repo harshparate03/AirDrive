@@ -29,9 +29,9 @@ const LoginPage = () => {
       return
     }
     try {
-      await dispatch(login({ email, password })).unwrap()
+      const loggedInUser = await dispatch(login({ email, password })).unwrap()
       toast.success('Welcome to Air Drive!')
-      navigate('/dashboard')
+      navigate(loggedInUser?.role === 'admin' ? '/admin' : '/dashboard', { replace: true })
     } catch (err) {
       toast.error(err || 'Login failed. Please try again.')
     }

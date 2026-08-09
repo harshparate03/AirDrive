@@ -43,9 +43,14 @@ const PrivateRoute = ({ children }) => {
 }
 
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, initialized } = useSelector(state => state.auth)
+  const { user, isAuthenticated, initialized } = useSelector(state => state.auth)
   if (!initialized) return null
-  return !isAuthenticated ? children : <Navigate to="/dashboard" replace />
+  return !isAuthenticated ? children : <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />
+}
+
+const AuthenticatedHome = () => {
+  const user = useSelector(state => state.auth.user)
+  return <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />
 }
 
 function App() {
@@ -115,7 +120,7 @@ return (
             <MainLayout />
           </PrivateRoute>
         }>
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<AuthenticatedHome />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="my-drive" element={<MyDrivePage />} />
           <Route path="folder/:folderId" element={<FolderPage />} />
