@@ -9,6 +9,7 @@ import {
 import { setContextMenu, openModal } from '../../store/slices/uiSlice'
 import api, { downloadFile } from '../../services/api'
 import toast from 'react-hot-toast'
+import { saveFileResponse } from '../../utils/fileActions'
 import { useConfirm } from './ConfirmDialog'
 
 const ContextMenu = () => {
@@ -70,10 +71,7 @@ const aiRename = useMutation({
   const handleDownload = async () => {
     try {
       const res = await downloadFile(file._id)
-      const url = URL.createObjectURL(new Blob([res.data]))
-      const a = document.createElement('a')
-      a.href = url; a.download = file.name; a.click()
-      URL.revokeObjectURL(url)
+      saveFileResponse(res, file.name)
     } catch { if (file.webContentLink) window.open(file.webContentLink) }
     close()
   }
