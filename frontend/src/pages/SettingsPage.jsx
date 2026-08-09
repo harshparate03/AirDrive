@@ -9,9 +9,11 @@ import api from '../services/api'
 import { useQuery } from '@tanstack/react-query'
 import ActivityHeatmap from '../components/charts/ActivityHeatmap'
 import ThemePicker from '../components/ui/ThemePicker'
+import { useConfirm } from '../components/ui/ConfirmDialog'
 
 const SettingsPage = () => {
   const dispatch = useDispatch()
+  const confirm = useConfirm()
   const { user } = useSelector(state => state.auth)
   const { theme } = useSelector(state => state.ui)
   const [name, setName] = useState(user?.name || '')
@@ -248,7 +250,18 @@ const SettingsPage = () => {
                 <p className="text-sm text-dark-400">{user?.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : '-'}</p>
               </div>
               <button
-                onClick={() => { if (confirm('Delete your account and all data?')) {} }}
+                onClick={async () => {
+                  const approved = await confirm({ title: 'Delete your account?', message: 'Your account metadata and AirDrive records will be permanently removed. This cannot be undone.', confirmLabel: 'Delete account' })
+                  if (!approved) return
+                  try {
+                    await api.delete('/users/account')
+                    localStorage.removeItem('accessToken')
+                    localStorage.removeItem('refreshToken')
+                    window.location.assign('/login')
+                  } catch (error) {
+                    toast.error(error.response?.data?.error || 'Account deletion failed')
+                  }
+                }}
                 className="btn-secondary text-red-500 text-sm flex items-center gap-2"
               >
                 <HiTrash /> Delete Account

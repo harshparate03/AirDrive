@@ -16,6 +16,7 @@ import MobileNav from './MobileNav'
 import ContextMenu from '../ui/ContextMenu'
 import { closeModal, setContextMenu } from '../../store/slices/uiSlice'
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts'
+import { ConfirmProvider } from '../ui/ConfirmDialog'
 
 const MainLayout = () => {
   const dispatch = useDispatch()
@@ -34,6 +35,7 @@ const MainLayout = () => {
   }, [contextMenu, dispatch])
 
   return (
+    <ConfirmProvider>
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-dark-950">
       {/* Sidebar — hidden on mobile */}
       <div className="hidden md:flex">
@@ -67,6 +69,7 @@ const MainLayout = () => {
       {/* Context Menu */}
       {contextMenu && <ContextMenu />}
     </div>
+    </ConfirmProvider>
   )
 }
 

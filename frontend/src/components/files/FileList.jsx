@@ -7,10 +7,12 @@ import api, { downloadFile } from '../../services/api'
 import { openModal, toggleFileSelection, setContextMenu } from '../../store/slices/uiSlice'
 import { getFileIcon, getFileColor, formatFileSize } from '../../utils/fileUtils'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../ui/ConfirmDialog'
 
 const FileRow = ({ file, onRefresh, showRestore }) => {
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const { selectedFiles } = useSelector(state => state.ui)
   const isSelected = selectedFiles.includes(file._id)
 
@@ -34,9 +36,9 @@ const restoreMutation = useMutation({
     onSuccess: () => { toast.success('File permanently deleted'); onRefresh?.() },
   })
 
-  const handlePermanentDelete = (e) => {
+  const handlePermanentDelete = async (e) => {
     e.stopPropagation()
-    if (window.confirm(`Permanently delete "${file.name}"? This cannot be undone.`)) {
+    if (await confirm({ title: 'Permanently delete file?', message: `"${file.name}" will be removed forever. This cannot be undone.`, confirmLabel: 'Delete forever' })) {
       permanentDeleteMutation.mutate()
     }
   }
@@ -60,6 +62,7 @@ const restoreMutation = useMutation({
       animate={{ opacity: 1, x: 0 }}
       onContextMenu={e => { e.preventDefault(); dispatch(setContextMenu({ x: e.clientX, y: e.clientY, file, type: 'file' })) }}
       onClick={() => dispatch(toggleFileSelection(file._id))}
+      onDoubleClick={() => !showRestore && dispatch(openModal({ modal: 'filePreview', data: file }))}
       className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer group transition-all hover:bg-slate-50 dark:hover:bg-dark-800 ${isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`}
     >
       {/* Checkbox */}
@@ -89,7 +92,7 @@ const restoreMutation = useMutation({
       </p>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0">
 {showRestore ? (
           <>
             <button onClick={e => { e.stopPropagation(); restoreMutation.mutate() }} className="btn-ghost p-1.5 text-xs text-green-500" title="Restore">

@@ -31,6 +31,7 @@ const FolderCard = ({ folder, onRefresh }) => {
       animate={{ opacity: 1, scale: 1 }}
       whileHover={{ y: -2 }}
       onContextMenu={handleContextMenu}
+      onClick={() => navigate(`/folder/${folder._id}`)}
       className="card p-4 cursor-pointer group relative hover:border-primary-200 dark:hover:border-primary-700"
       onDoubleClick={() => navigate(`/folder/${folder._id}`)}
     >

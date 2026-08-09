@@ -23,6 +23,10 @@ const UploadPanel = () => {
 
   const completedCount = queue.filter(q => q.status === 'completed').length
   const isAllDone = completedCount === queue.length
+  const totalBytes = queue.reduce((sum, item) => sum + (item.size || 0), 0)
+  const uploadedBytes = queue.reduce((sum, item) => sum + ((item.size || 0) * (item.progress || 0) / 100), 0)
+  const remainingBytes = Math.max(0, totalBytes - uploadedBytes)
+  const overallProgress = totalBytes ? Math.round((uploadedBytes / totalBytes) * 100) : 0
 
   return (
     <AnimatePresence>
@@ -35,9 +39,12 @@ const UploadPanel = () => {
         {/* Header */}
         <div className="flex items-center gap-2 p-3 bg-dark-800 dark:bg-dark-900 text-white">
           <HiUpload className="text-primary-400" />
-          <span className="text-sm font-medium flex-1">
-            {isAllDone ? `${completedCount} uploads complete` : `Uploading ${queue.length - completedCount} files...`}
-          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">
+              {isAllDone ? `${completedCount} uploads complete` : `Uploading ${queue.length - completedCount} files · ${overallProgress}%`}
+            </p>
+            {!isAllDone && <p className="text-[11px] text-dark-300">{formatFileSize(uploadedBytes)} uploaded · {formatFileSize(remainingBytes)} remaining</p>}
+          </div>
           <button onClick={() => setCollapsed(!collapsed)} className="text-dark-300 hover:text-white p-1">
             {collapsed ? <HiChevronUp /> : <HiChevronDown />}
           </button>

@@ -7,6 +7,7 @@ import {
 } from 'react-icons/hi'
 import api from '../services/api'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../components/ui/ConfirmDialog'
 
 const CreateRequestModal = ({ onClose, onCreated }) => {
   const queryClient = useQueryClient()
@@ -85,6 +86,7 @@ const CreateRequestModal = ({ onClose, onCreated }) => {
 }
 
 const FileRequestPage = () => {
+  const confirm = useConfirm()
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [copied, setCopied] = useState(null)
@@ -181,7 +183,7 @@ const FileRequestPage = () => {
                   className={`btn-secondary text-sm flex items-center gap-1.5 ${copied === req.token ? 'text-green-500 border-green-300' : ''}`}>
                   {copied === req.token ? <><HiCheck /> Copied</> : <><HiLink /> Copy Link</>}
                 </button>
-                <button onClick={() => { if (window.confirm('Deactivate this request?')) deleteMutation.mutate(req._id) }}
+                <button onClick={async () => { if (await confirm({ title: 'Deactivate request?', message: 'This upload link will stop accepting files.', confirmLabel: 'Deactivate' })) deleteMutation.mutate(req._id) }}
                   className="btn-ghost p-2 text-red-400 hover:text-red-500">
                   <HiTrash />
                 </button>

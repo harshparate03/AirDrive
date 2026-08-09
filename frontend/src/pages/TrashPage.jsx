@@ -8,10 +8,12 @@ import toast from 'react-hot-toast'
 import FileList from '../components/files/FileList'
 import FileGrid from '../components/files/FileGrid'
 import ViewModeToggle from '../components/ui/ViewModeToggle'
+import { useConfirm } from '../components/ui/ConfirmDialog'
 
 const TrashPage = () => {
   const { viewMode } = useSelector(state => state.ui)
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
 
   const { data, isLoading } = useQuery({
     queryKey: ['trash'],
@@ -50,8 +52,8 @@ const TrashPage = () => {
           <ViewModeToggle />
           {files.length > 0 && (
             <button
-              onClick={() => {
-                if (confirm('Permanently delete all files in trash?')) emptyTrashMutation.mutate()
+              onClick={async () => {
+                if (await confirm({ title: 'Empty trash?', message: 'Every file in trash will be permanently deleted. This cannot be undone.', confirmLabel: 'Empty trash' })) emptyTrashMutation.mutate()
               }}
               className="btn-secondary text-red-500 text-sm flex items-center gap-2"
             >

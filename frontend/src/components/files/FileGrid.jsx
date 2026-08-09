@@ -11,10 +11,12 @@ import { openModal, toggleFileSelection, setContextMenu } from '../../store/slic
 import { getFileIcon, getFileColor, formatFileSize } from '../../utils/fileUtils'
 import toast from 'react-hot-toast'
 import FileContextMenu from './FileContextMenu'
+import { useConfirm } from '../ui/ConfirmDialog'
 
 const FileCard = ({ file, onRefresh, showRestore }) => {
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const { selectedFiles } = useSelector(state => state.ui)
   const isSelected = selectedFiles.includes(file._id)
 
@@ -45,9 +47,9 @@ const FileCard = ({ file, onRefresh, showRestore }) => {
     onSuccess: () => { toast.success('File permanently deleted'); onRefresh?.() },
   })
 
-  const handlePermanentDelete = (e) => {
+  const handlePermanentDelete = async (e) => {
     e.stopPropagation()
-    if (window.confirm(`Permanently delete "${file.name}"? This cannot be undone.`)) {
+    if (await confirm({ title: 'Permanently delete file?', message: `"${file.name}" will be removed forever. This cannot be undone.`, confirmLabel: 'Delete forever' })) {
       permanentDeleteMutation.mutate()
     }
   }
@@ -82,6 +84,7 @@ const FileCard = ({ file, onRefresh, showRestore }) => {
       whileHover={{ y: -2 }}
       onContextMenu={handleContextMenu}
       onClick={() => dispatch(toggleFileSelection(file._id))}
+      onDoubleClick={() => !showRestore && dispatch(openModal({ modal: 'filePreview', data: file }))}
       className={`card p-4 cursor-pointer group relative transition-all ${isSelected ? 'ring-2 ring-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'hover:border-primary-200 dark:hover:border-primary-700'}`}
     >
       {/* Selection checkbox */}
@@ -124,7 +127,7 @@ const FileCard = ({ file, onRefresh, showRestore }) => {
       )}
 
 {/* Quick actions on hover */}
-      <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+      <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
         {showRestore ? (
           <>
             <button
