@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
@@ -18,6 +18,7 @@ import { logoutUser } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
 import AdminAnalytics from '../components/admin/AdminAnalytics'
 import { AdminProfile, AdminSettings } from '../components/admin/AdminProfileSettings'
+import { getSocket } from '../services/socket'
 
 const AdminPage = () => {
   const dispatch = useDispatch()
@@ -320,11 +321,24 @@ const AdminPage = () => {
 }
 
 const AdminNotifications = () => {
+  const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['admin-notifications'],
     queryFn: () => api.get('/admin/notifications').then(r => r.data),
     refetchInterval: 15000,
   })
+
+  useEffect(() => {
+    const socket = getSocket()
+    if (!socket) return undefined
+
+    const refreshAdminAlerts = () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-notifications'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] })
+    }
+    socket.on('admin-notification', refreshAdminAlerts)
+    return () => socket.off('admin-notification', refreshAdminAlerts)
+  }, [queryClient])
 
   const notifications = data?.notifications || []
 

@@ -103,7 +103,15 @@ router.get('/notifications', async (req, res) => {
     const now = new Date();
     const recent = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
-    const [logins, signups, activity] = await Promise.all([
+    const [adminAlerts, logins, signups, activity] = await Promise.all([
+      Notification.find({
+        userId: req.user._id,
+        $or: [
+          { audience: 'admin' },
+          { audience: { $exists: false }, link: '/admin' },
+        ],
+        createdAt: { $gte: recent },
+      }).sort({ createdAt: -1 }).limit(50).lean(),
       Activity.find({ action: 'login', createdAt: { $gte: recent } })
         .sort({ createdAt: -1 }).limit(30)
         .populate('userId', 'name email').lean(),
@@ -115,6 +123,16 @@ router.get('/notifications', async (req, res) => {
     ]);
 
     const items = [
+      ...adminAlerts.map(n => ({
+        _id: `notification-${n._id}`,
+        type: n.data?.event === 'new_user_login' ? 'signup' : 'login',
+        title: n.title,
+        message: n.message,
+        email: n.data?.email || '',
+        createdAt: n.createdAt,
+        ip: n.data?.ip || '',
+        source: 'notification',
+      })),
       ...logins.map(a => ({
         _id: `login-${a._id}`,
         type: 'login',
@@ -142,7 +160,19 @@ router.get('/notifications', async (req, res) => {
       })),
     ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    res.json({ notifications: items.slice(0, 50) });
+    // Stored admin alerts are authoritative. Activity and user records remain as
+    // a historical fallback, but should not create duplicate login/signup cards.
+    const seen = new Set();
+    const notifications = items.filter(item => {
+      if (!['login', 'signup'].includes(item.type) || !item.email) return true;
+      const minute = Math.floor(new Date(item.createdAt).getTime() / 60000);
+      const key = `${item.type}:${item.email.toLowerCase()}:${minute}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    res.json({ notifications: notifications.slice(0, 50) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch admin notifications' });
   }

@@ -45,9 +45,15 @@ const issueTokens = async (user, clientInfo, isNewUser, io) => {
       await createNotification(io, admin._id, {
         audience: 'admin',
         type: 'system',
-        title: isNewUser ? 'New User Registered' : 'User Login',
-        message: `${user.name} (${user.email}) ${isNewUser ? 'signed up' : 'logged in'} from ${clientInfo.ip}`,
-        data: { userId: user._id, email: user.email, name: user.name, ...clientInfo },
+        title: isNewUser ? 'New User Registered & Logged In' : 'User Login Detected',
+        message: `${user.name} (${user.email}) ${isNewUser ? 'created an account and logged in' : 'logged in'} from ${clientInfo.ip}`,
+        data: {
+          event: isNewUser ? 'new_user_login' : 'user_login',
+          userId: user._id,
+          email: user.email,
+          name: user.name,
+          ...clientInfo,
+        },
         icon: isNewUser ? 'user-add' : 'login',
         link: '/admin',
       });
