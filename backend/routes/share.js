@@ -32,6 +32,13 @@ router.post('/', authenticate, async (req, res) => {
     if (permission !== 'viewer') {
       return res.status(400).json({ error: 'Only viewer links are currently supported' });
     }
+    let expiryDate = null;
+    if (expiresAt) {
+      expiryDate = new Date(expiresAt);
+      if (Number.isNaN(expiryDate.getTime()) || expiryDate.getTime() <= Date.now()) {
+        return res.status(400).json({ error: 'Expiry must be a valid future date and time' });
+      }
+    }
 
     const ownedItem = fileId
       ? await File.findOne({ _id: fileId, userId: req.user._id, trashed: false }).select('_id')
@@ -50,7 +57,7 @@ router.post('/', authenticate, async (req, res) => {
       token,
       permission,
       password: password ? hashPassword(password) : null,
-      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      expiresAt: expiryDate,
       downloadDisabled,
       allowedEmails: Array.isArray(allowedEmails)
         ? [...new Set(allowedEmails.map(email => String(email).trim().toLowerCase()).filter(Boolean))]

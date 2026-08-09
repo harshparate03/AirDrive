@@ -6,6 +6,13 @@ import { HiX, HiLink, HiLockClosed, HiMail, HiQrcode, HiCheck, HiShare } from 'r
 import { closeModal } from '../../store/slices/uiSlice'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import QRCode from 'qrcode'
+
+const minimumExpiryValue = () => {
+  const date = new Date(Date.now() + 60000)
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+  return date.toISOString().slice(0, 16)
+}
 
 const ShareModal = () => {
   const dispatch = useDispatch()
@@ -30,11 +37,13 @@ const ShareModal = () => {
       downloadDisabled,
       allowedEmails: allowedEmails.split(',').map(value => value.trim()).filter(Boolean),
     }),
-    onSuccess: (res) => {
-      setCreatedLink(res.data)
+    onSuccess: async (res) => {
+      const liveShareUrl = `${window.location.origin}/share/${res.data.shareLink?.token}`
+      const clientQrCode = await QRCode.toDataURL(liveShareUrl, { width: 320, margin: 2 })
+      setCreatedLink({ ...res.data, shareUrl: liveShareUrl, clientQrCode })
       toast.success('Share link created')
     },
-    onError: () => toast.error('Failed to create share link'),
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to create share link'),
   })
 
   const emailMutation = useMutation({
@@ -46,7 +55,7 @@ const ShareModal = () => {
     onError: () => toast.error('Failed to send email'),
   })
 
-  const shareUrl = createdLink?.shareUrl || (createdLink ? `${window.location.origin}/share/${createdLink.shareLink?.token}` : null)
+  const shareUrl = createdLink?.shareUrl || null
 
   const copyLink = () => {
     navigator.clipboard.writeText(shareUrl)
@@ -56,12 +65,12 @@ const ShareModal = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-black/40 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="card w-full max-w-md overflow-hidden"
+        className="card my-auto w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain"
       >
         {/* Header */}
         <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-dark-700">
@@ -105,6 +114,7 @@ const ShareModal = () => {
                 type="datetime-local"
                 value={expiresAt}
                 onChange={e => setExpiresAt(e.target.value)}
+                min={minimumExpiryValue()}
                 className="input text-sm py-2"
               />
             </div>
@@ -178,15 +188,15 @@ const ShareModal = () => {
               )}
 
               {/* QR tab */}
-              {tab === 'qr' && createdLink?.shareLink?.qrCode && (
+              {tab === 'qr' && (createdLink?.clientQrCode || createdLink?.shareLink?.qrCode) && (
                 <div className="flex flex-col items-center gap-3">
-                  <img src={createdLink.shareLink.qrCode} alt="QR Code" className="w-40 h-40 rounded-xl" />
+                  <img src={createdLink.clientQrCode || createdLink.shareLink.qrCode} alt="QR Code" className="w-40 h-40 rounded-xl" />
                   <p className="max-w-full break-all text-center text-xs text-dark-400">{shareUrl}</p>
                   <a href={shareUrl} target="_blank" rel="noreferrer" className="btn-primary text-sm flex items-center gap-2">
                     <HiLink /> Open Shared File
                   </a>
                   <a
-                    href={createdLink.shareLink.qrCode}
+                    href={createdLink.clientQrCode || createdLink.shareLink.qrCode}
                     download="airdrive-qr.png"
                     className="btn-secondary text-sm flex items-center gap-2"
                   >
