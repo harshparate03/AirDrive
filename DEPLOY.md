@@ -103,7 +103,7 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=<email-user>
 EMAIL_PASS=<gmail-app-password>
-CLIENT_URL=https://air-drive-j5p1nb45r-harsh-parate-s-projects.vercel.app
+CLIENT_URL=https://air-drive-snowy.vercel.app
 ```
 
 ## Google OAuth
