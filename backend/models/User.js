@@ -26,6 +26,8 @@ const userSchema = new mongoose.Schema({
   passwordResetOTP: { type: String, default: null, select: false },
   passwordResetOTPExpires: { type: Date, default: null },
   passwordResetAttempts: { type: Number, default: 0 },
+  passwordResetToken: { type: String, default: null, select: false },
+  passwordResetTokenExpires: { type: Date, default: null, select: false },
 
   // Login attempt tracking (rate limiting / lockout)
   loginAttempts: { type: Number, default: 0 },
@@ -75,6 +77,8 @@ userSchema.methods.toPublic = function () {
   delete obj.googleRefreshToken;
   delete obj.refreshToken;
   delete obj.passwordResetOTP;
+  delete obj.passwordResetToken;
+  delete obj.passwordResetTokenExpires;
   delete obj.emailVerifyToken;
   return obj;
 };

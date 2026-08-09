@@ -1,232 +1,117 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { HiCloudUpload, HiMail, HiLockClosed, HiKey, HiEye, HiEyeOff } from 'react-icons/hi'
-import { forgotPassword, verifyOtp, resetPassword } from '../store/slices/authSlice'
+import { AnimatePresence, motion } from 'framer-motion'
+import { HiArrowLeft, HiCheck, HiCloudUpload, HiEye, HiEyeOff, HiLockClosed, HiMail, HiRefresh, HiShieldCheck, HiX } from 'react-icons/hi'
+import { forgotPassword, resetPassword, verifyOtp } from '../store/slices/authSlice'
 import toast from 'react-hot-toast'
+
+const steps = ['Email', 'Verify', 'Password']
 
 const ForgotPasswordPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { loading } = useSelector(state => state.auth)
-
-  const [step, setStep] = useState(1) // 1: email, 2: OTP, 3: new password
+  const inputs = useRef([])
+  const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState('')
+  const [digits, setDigits] = useState(Array(6).fill(''))
   const [resetToken, setResetToken] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [status, setStatus] = useState('idle')
+  const [resendIn, setResendIn] = useState(0)
 
-  const handleSendOtp = async (e) => {
-    e.preventDefault()
-    if (!email) {
-      toast.error('Please enter your email')
-      return
-    }
+  useEffect(() => {
+    if (!resendIn) return undefined
+    const timer = setInterval(() => setResendIn(value => Math.max(0, value - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [resendIn])
+
+  const maskedEmail = email.replace(/^(.{2})(.*)(@.*)$/, (_, start, middle, domain) => `${start}${'*'.repeat(Math.min(middle.length, 7))}${domain}`)
+  const sendCode = async (event) => {
+    event?.preventDefault()
     try {
-      await dispatch(forgotPassword(email)).unwrap()
-      toast.success('OTP sent to your email')
-      setStep(2)
-    } catch (err) {
-      toast.error(err || 'Failed to send OTP')
-    }
+      await dispatch(forgotPassword(email.trim())).unwrap()
+      setDigits(Array(6).fill('')); setStatus('idle'); setResendIn(60); setStep(2)
+      toast.success('Verification code sent')
+      setTimeout(() => inputs.current[0]?.focus(), 150)
+    } catch (error) { toast.error(error || 'Unable to send verification code') }
   }
 
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault()
-    if (!otp) {
-      toast.error('Please enter the OTP')
-      return
-    }
+  const updateDigit = (index, value) => {
+    const digit = value.replace(/\D/g, '').slice(-1)
+    setDigits(current => current.map((item, itemIndex) => itemIndex === index ? digit : item))
+    setStatus('idle')
+    if (digit && index < 5) inputs.current[index + 1]?.focus()
+  }
+
+  const handleKeyDown = (index, event) => {
+    if (event.key === 'Backspace' && !digits[index] && index > 0) inputs.current[index - 1]?.focus()
+    if (event.key === 'ArrowLeft' && index > 0) inputs.current[index - 1]?.focus()
+    if (event.key === 'ArrowRight' && index < 5) inputs.current[index + 1]?.focus()
+  }
+
+  const handlePaste = (event) => {
+    const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    event.preventDefault()
+    setDigits(Array.from({ length: 6 }, (_, index) => pasted[index] || ''))
+    inputs.current[Math.min(pasted.length, 6) - 1]?.focus()
+  }
+
+  const verifyCode = async (event) => {
+    event.preventDefault()
+    const otp = digits.join('')
+    if (otp.length !== 6) return toast.error('Enter all 6 digits')
+    setStatus('checking')
     try {
       const token = await dispatch(verifyOtp({ email, otp })).unwrap()
-      setResetToken(token)
-      setStep(3)
-      toast.success('OTP verified! Set a new password')
-    } catch (err) {
-      toast.error(err || 'OTP verification failed')
+      setResetToken(token); setStatus('success')
+      setTimeout(() => setStep(3), 650)
+    } catch (error) {
+      setStatus('error'); toast.error(error || 'Invalid verification code')
+      setTimeout(() => { setDigits(Array(6).fill('')); setStatus('idle'); inputs.current[0]?.focus() }, 900)
     }
   }
 
-  const handleResetPassword = async (e) => {
-    e.preventDefault()
-    if (!newPassword || !confirmPassword) {
-      toast.error('Please fill in all fields')
-      return
-    }
-    if (newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match')
-      return
-    }
+  const savePassword = async (event) => {
+    event.preventDefault()
+    if (newPassword.length < 8) return toast.error('Use at least 8 characters')
+    if (newPassword !== confirmPassword) return toast.error('Passwords do not match')
     try {
       await dispatch(resetPassword({ email, resetToken, newPassword })).unwrap()
-      toast.success('Password reset successfully! Please sign in.')
-      navigate('/login')
-    } catch (err) {
-      toast.error(err || 'Password reset failed')
-    }
+      toast.success('Password reset successfully')
+      navigate('/login', { replace: true })
+    } catch (error) { toast.error(error || 'Password reset failed') }
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="glass-card p-8 text-white"
-    >
-      {/* Logo */}
-      <div className="text-center mb-8">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', delay: 0.1 }}
-          className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-purple-600 shadow-neon mb-4"
-        >
-          <HiCloudUpload className="text-3xl text-white" />
-        </motion.div>
-        <h1 className="text-3xl font-bold text-dark-900 dark:text-white">Reset Password</h1>
-        <p className="text-dark-500 dark:text-dark-300 mt-1">
-          {step === 1 && 'Enter your email to receive a reset code'}
-          {step === 2 && 'Enter the OTP sent to your email'}
-          {step === 3 && 'Choose a new password'}
-        </p>
-      </div>
+    <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-[28px] border border-white/25 bg-white/10 p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,.32)] backdrop-blur-2xl sm:p-9">
+      <div className="pointer-events-none absolute -left-20 -top-24 h-48 w-48 rounded-full bg-white/10" />
+      <header className="relative text-center">
+        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-white/30 bg-gradient-to-br from-white/25 to-indigo-400/20 shadow-xl"><HiCloudUpload className="text-3xl" /></div>
+        <p className="text-[10px] font-black uppercase tracking-[.2em] text-indigo-200">Secure account recovery</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight">{step === 1 ? 'Forgot password?' : step === 2 ? 'OTP Verification' : 'Create new password'}</h1>
+        <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-300">{step === 1 ? 'Enter your AirDrive email and we will send a secure verification code.' : step === 2 ? `Enter the 6-digit code sent to ${maskedEmail}.` : 'Choose a strong password you have not used before.'}</p>
+      </header>
 
-      {/* Step indicator */}
-      <div className="flex items-center justify-center gap-2 mb-6">
-        {[1, 2, 3].map(s => (
-          <div
-            key={s}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              step >= s ? 'w-8 bg-primary-500' : 'w-4 bg-slate-300 dark:bg-dark-600'
-            }`}
-          />
-        ))}
-      </div>
+      <div className="my-6 flex items-center justify-center gap-2">{steps.map((label, index) => <React.Fragment key={label}><div className={`grid h-7 w-7 place-items-center rounded-full text-[11px] font-bold ${step > index + 1 ? 'bg-emerald-400 text-slate-950' : step === index + 1 ? 'bg-indigo-400 text-white ring-4 ring-indigo-300/15' : 'bg-white/10 text-slate-400'}`}>{step > index + 1 ? <HiCheck /> : index + 1}</div>{index < 2 && <div className={`h-px w-10 ${step > index + 1 ? 'bg-emerald-400' : 'bg-white/15'}`} />}</React.Fragment>)}</div>
 
-      {/* Step 1: Email */}
-      {step === 1 && (
-        <form onSubmit={handleSendOtp} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
-              Email
-            </label>
-            <div className="relative">
-              <HiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                className="input pl-10"
-              />
-            </div>
-          </div>
-          <button type="submit" disabled={loading} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
-            {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            {loading ? 'Sending...' : 'Send OTP'}
-          </button>
-        </form>
-      )}
+      <AnimatePresence mode="wait">
+        {step === 1 && <motion.form key="email" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} onSubmit={sendCode} className="space-y-4"><label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-200">Email address</span><div className="relative"><HiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input autoFocus type="email" required value={email} onChange={event => setEmail(event.target.value)} className="w-full rounded-xl border border-white/15 bg-white/10 py-3 pl-10 pr-4 text-white outline-none placeholder:text-slate-500 focus:border-indigo-300 focus:ring-4 focus:ring-indigo-300/10" placeholder="you@example.com" /></div></label><button disabled={loading} className="w-full rounded-xl border border-white/25 bg-gradient-to-r from-indigo-400/80 to-violet-500/80 py-3 font-bold shadow-xl transition hover:-translate-y-0.5 disabled:opacity-60">{loading ? 'Sending code...' : 'Send verification code'}</button></motion.form>}
 
-      {/* Step 2: OTP */}
-      {step === 2 && (
-        <form onSubmit={handleVerifyOtp} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
-              OTP Code
-            </label>
-            <div className="relative">
-              <HiKey className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400" />
-              <input
-                type="text"
-                value={otp}
-                onChange={e => setOtp(e.target.value)}
-                placeholder="Enter 6-digit code"
-                required
-                className="input pl-10 tracking-widest"
-              />
-            </div>
-          </div>
-          <button type="submit" disabled={loading} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
-            {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            {loading ? 'Verifying...' : 'Verify OTP'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            className="w-full text-center text-sm text-dark-500 hover:text-primary-500"
-          >
-            Change email
-          </button>
-        </form>
-      )}
+        {step === 2 && <motion.form key="otp" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} onSubmit={verifyCode} className="space-y-4"><div className="relative flex h-20 items-center justify-center"><div className={`flex gap-2 transition-all duration-500 ${status === 'checking' ? 'scale-90 animate-pulse' : ''} ${status === 'success' || status === 'error' ? 'scale-75 opacity-0' : ''}`} onPaste={handlePaste}>{digits.map((digit, index) => <input key={index} ref={element => { inputs.current[index] = element }} aria-label={`OTP digit ${index + 1}`} inputMode="numeric" autoComplete={index === 0 ? 'one-time-code' : 'off'} maxLength="1" value={digit} onChange={event => updateDigit(index, event.target.value)} onKeyDown={event => handleKeyDown(index, event)} className={`h-14 w-11 rounded-xl border text-center text-xl font-black text-white outline-none backdrop-blur-xl sm:h-16 sm:w-12 ${digit ? 'border-indigo-300/60 bg-indigo-400/15' : 'border-white/20 bg-white/10'} focus:border-indigo-200 focus:ring-4 focus:ring-indigo-300/10`} />)}</div>{(status === 'success' || status === 'error') && <motion.div initial={{ scale: .5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`absolute grid h-16 w-16 place-items-center rounded-2xl border-2 text-3xl ${status === 'success' ? 'border-emerald-300 bg-emerald-400/15 text-emerald-300' : 'border-rose-300 bg-rose-400/15 text-rose-300'}`}>{status === 'success' ? <HiCheck /> : <HiX />}</motion.div>}</div><button disabled={loading || status === 'checking'} className="w-full rounded-xl border border-white/25 bg-gradient-to-r from-indigo-400/80 to-violet-500/80 py-3 font-bold shadow-xl disabled:opacity-60">{status === 'checking' ? 'Checking code...' : status === 'success' ? 'Verified' : 'Verify OTP'}</button><div className="flex items-center justify-between text-xs"><button type="button" onClick={() => setStep(1)} className="flex items-center gap-1 text-slate-300 hover:text-white"><HiArrowLeft /> Change email</button><button type="button" disabled={resendIn > 0 || loading} onClick={sendCode} className="flex items-center gap-1 font-bold text-indigo-200 disabled:text-slate-500"><HiRefresh /> {resendIn ? `Resend in ${resendIn}s` : 'Resend code'}</button></div></motion.form>}
 
-      {/* Step 3: New Password */}
-      {step === 3 && (
-        <form onSubmit={handleResetPassword} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
-              New Password
-            </label>
-<div className="relative">
-              <HiLockClosed className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                placeholder="At least 6 characters"
-                required
-                className="input pl-10 pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(s => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-600 dark:hover:text-dark-200"
-                aria-label="Toggle password visibility"
-              >
-                {showPassword ? <HiEyeOff /> : <HiEye />}
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
-              Confirm New Password
-            </label>
-            <div className="relative">
-<HiLockClosed className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                required
-                className="input pl-10"
-              />
-            </div>
-          </div>
-          <button type="submit" disabled={loading} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
-            {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            {loading ? 'Resetting...' : 'Reset Password'}
-          </button>
-        </form>
-      )}
+        {step === 3 && <motion.form key="password" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} onSubmit={savePassword} className="space-y-4"><PasswordField label="New password" value={newPassword} onChange={setNewPassword} show={showPassword} toggle={() => setShowPassword(value => !value)} /><PasswordField label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} show={showPassword} /><div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-300"><p className="flex items-center gap-2 font-bold text-slate-200"><HiShieldCheck /> Password requirements</p><p className="mt-1">At least 8 characters and both entries must match.</p></div><button disabled={loading} className="w-full rounded-xl border border-white/25 bg-gradient-to-r from-indigo-400/80 to-violet-500/80 py-3 font-bold shadow-xl disabled:opacity-60">{loading ? 'Updating password...' : 'Reset password'}</button></motion.form>}
+      </AnimatePresence>
 
-      <p className="text-center text-sm text-dark-500 dark:text-dark-400 mt-6">
-        Remembered your password?{' '}
-        <Link to="/login" className="text-primary-500 hover:text-primary-600 font-medium">
-          Sign in
-        </Link>
-      </p>
-    </motion.div>
+      <p className="mt-6 text-center text-xs text-slate-400">Remembered your password? <Link to="/login" className="font-bold text-indigo-200 hover:text-white">Sign in</Link></p>
+    </motion.section>
   )
 }
+
+const PasswordField = ({ label, value, onChange, show, toggle }) => <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-200">{label}</span><div className="relative"><HiLockClosed className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type={show ? 'text' : 'password'} required value={value} onChange={event => onChange(event.target.value)} className="w-full rounded-xl border border-white/15 bg-white/10 py-3 pl-10 pr-10 text-white outline-none placeholder:text-slate-500 focus:border-indigo-300 focus:ring-4 focus:ring-indigo-300/10" placeholder="Minimum 8 characters" />{toggle && <button type="button" onClick={toggle} aria-label="Toggle password visibility" className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">{show ? <HiEyeOff /> : <HiEye />}</button>}</div></label>
 
 export default ForgotPasswordPage
