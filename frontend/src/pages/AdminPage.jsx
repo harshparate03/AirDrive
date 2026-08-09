@@ -6,6 +6,7 @@ import {
   HiSpeakerphone, HiRefresh, HiExclamation, HiBell, HiUserCircle, HiChevronRight,
   HiHome, HiLogout, HiMenu, HiX, HiMoon, HiSun, HiExternalLink,
   HiCog, HiUser,
+  HiLightningBolt, HiShare,
 } from 'react-icons/hi'
 import { useDispatch, useSelector } from 'react-redux'
 import { Navigate, useNavigate } from 'react-router-dom'
@@ -59,6 +60,8 @@ const AdminPage = () => {
     { label: 'Active Today', value: dashData?.activeUsers || 0, icon: HiShieldCheck, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20' },
     { label: 'Total Files', value: dashData?.totalFiles || 0, icon: HiDatabase, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
     { label: 'AI Requests', value: dashData?.aiUsage?.reduce((a, b) => a + b.count, 0) || 0, icon: HiChartBar, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    { label: 'Interactions (30d)', value: dashData?.totalInteractions30d || 0, icon: HiLightningBolt, color: 'text-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-900/20' },
+    { label: 'Sharing Activity (30d)', value: dashData?.shareInteractions30d || 0, icon: HiShare, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20' },
   ]
 
   const tabs = [
@@ -174,7 +177,7 @@ const AdminPage = () => {
       {/* Dashboard tab */}
       {activeTab === 'dashboard' && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4">
             {stats.map((s, i) => (
               <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="card p-4">
                 <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-3`}>

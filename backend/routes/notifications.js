@@ -3,11 +3,21 @@ const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const Notification = require('../models/Notification');
 
+// Personal notifications only. Legacy records did not have an audience, so keep
+// them unless they are identifiable as the old admin-only platform alerts.
+const personalNotificationQuery = (userId) => ({
+  userId,
+  $or: [
+    { audience: 'user' },
+    { audience: { $exists: false }, link: { $ne: '/admin' } },
+  ],
+});
+
 // GET /api/notifications
 router.get('/', authenticate, async (req, res) => {
   try {
     const { page = 1, limit = 20, unread } = req.query;
-    const query = { userId: req.user._id };
+    const query = personalNotificationQuery(req.user._id);
     if (unread === 'true') query.read = false;
 
     const [notifications, unreadCount] = await Promise.all([
@@ -16,7 +26,7 @@ router.get('/', authenticate, async (req, res) => {
         .skip((page - 1) * parseInt(limit))
         .limit(parseInt(limit))
         .lean(),
-      Notification.countDocuments({ userId: req.user._id, read: false }),
+      Notification.countDocuments({ ...personalNotificationQuery(req.user._id), read: false }),
     ]);
 
     res.json({ notifications, unreadCount });
@@ -29,7 +39,7 @@ router.get('/', authenticate, async (req, res) => {
 router.patch('/:id/read', authenticate, async (req, res) => {
   try {
     await Notification.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user._id },
+      { _id: req.params.id, ...personalNotificationQuery(req.user._id) },
       { read: true }
     );
     res.json({ message: 'Marked as read' });
@@ -41,7 +51,10 @@ router.patch('/:id/read', authenticate, async (req, res) => {
 // PATCH /api/notifications/read-all - Mark all as read
 router.patch('/read-all', authenticate, async (req, res) => {
   try {
-    await Notification.updateMany({ userId: req.user._id, read: false }, { read: true });
+    await Notification.updateMany(
+      { ...personalNotificationQuery(req.user._id), read: false },
+      { read: true }
+    );
     res.json({ message: 'All notifications marked as read' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to mark all notifications' });
@@ -51,7 +64,10 @@ router.patch('/read-all', authenticate, async (req, res) => {
 // DELETE /api/notifications/:id
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    await Notification.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+    await Notification.findOneAndDelete({
+      _id: req.params.id,
+      ...personalNotificationQuery(req.user._id),
+    });
     res.json({ message: 'Notification deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete notification' });

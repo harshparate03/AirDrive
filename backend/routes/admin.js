@@ -84,7 +84,14 @@ router.get('/dashboard', async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
-    res.json({ totalUsers, activeUsers, totalFiles, recentActivities, aiUsage, storageStats, userGrowth, recentLogins, recentSignups, activityTrends, activityBreakdown });
+    const totalInteractions30d = activityBreakdown.reduce((total, item) => total + item.count, 0);
+    const shareActions = new Set(['share', 'share_created', 'share_accessed', 'access', 'download']);
+    const shareInteractions30d = activityBreakdown.reduce(
+      (total, item) => total + (shareActions.has(item._id) ? item.count : 0),
+      0
+    );
+
+    res.json({ totalUsers, activeUsers, totalFiles, recentActivities, aiUsage, storageStats, userGrowth, recentLogins, recentSignups, activityTrends, activityBreakdown, totalInteractions30d, shareInteractions30d });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch admin dashboard' });
   }
