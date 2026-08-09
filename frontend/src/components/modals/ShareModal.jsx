@@ -46,15 +46,14 @@ const ShareModal = () => {
     onError: () => toast.error('Failed to send email'),
   })
 
+  const shareUrl = createdLink?.shareUrl || (createdLink ? `${window.location.origin}/share/${createdLink.shareLink?.token}` : null)
+
   const copyLink = () => {
-    const url = `${window.location.origin}/share/${createdLink?.shareLink?.token}`
-    navigator.clipboard.writeText(url)
+    navigator.clipboard.writeText(shareUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
     toast.success('Link copied!')
   }
-
-  const shareUrl = createdLink ? `${window.location.origin}/share/${createdLink.shareLink?.token}` : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -182,6 +181,10 @@ const ShareModal = () => {
               {tab === 'qr' && createdLink?.shareLink?.qrCode && (
                 <div className="flex flex-col items-center gap-3">
                   <img src={createdLink.shareLink.qrCode} alt="QR Code" className="w-40 h-40 rounded-xl" />
+                  <p className="max-w-full break-all text-center text-xs text-dark-400">{shareUrl}</p>
+                  <a href={shareUrl} target="_blank" rel="noreferrer" className="btn-primary text-sm flex items-center gap-2">
+                    <HiLink /> Open Shared File
+                  </a>
                   <a
                     href={createdLink.shareLink.qrCode}
                     download="airdrive-qr.png"

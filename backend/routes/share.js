@@ -13,6 +13,7 @@ const localService = require('../services/localStorage');
 const { ensureFileText } = require('../services/textExtraction');
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
+const { getPublicClientUrl } = require('../utils/publicClientUrl');
 
 // Helper to get a user's Google tokens
 const getTokens = (user) => ({
@@ -38,7 +39,7 @@ router.post('/', authenticate, async (req, res) => {
     if (!ownedItem) return res.status(404).json({ error: 'File or folder not found' });
 
     const token = uuidv4().replace(/-/g, '');
-    const shareUrl = `${process.env.CLIENT_URL}/share/${token}`;
+    const shareUrl = `${getPublicClientUrl(req)}/share/${token}`;
 
     const qrCode = await QRCode.toDataURL(shareUrl);
 
@@ -304,7 +305,7 @@ router.post('/email', authenticate, async (req, res) => {
       .populate('fileId', 'name')
       .populate('folderId', 'name');
     if (!shareLink) return res.status(404).json({ error: 'Share link not found' });
-    const shareUrl = `${process.env.CLIENT_URL}/share/${shareLink.token}`;
+    const shareUrl = `${getPublicClientUrl(req)}/share/${shareLink.token}`;
     const fileName = shareLink.fileId?.name || shareLink.folderId?.name || 'Shared item';
     const permission = shareLink.permission;
     const safeName = String(fileName).replace(/[<>&"']/g, '');
