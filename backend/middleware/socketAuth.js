@@ -8,8 +8,8 @@ const socketAuth = async (socket, next) => {
       return next(new Error('Authentication error: No token'));
     }
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('_id name email photo role');
-    if (!user) {
+    const user = await User.findById(decoded.userId).select('_id name email photo role isActive');
+    if (!user || !user.isActive) {
       return next(new Error('Authentication error: User not found'));
     }
     socket.user = user;

@@ -39,7 +39,7 @@ router.post('/:fileId', authenticate, async (req, res) => {
     const { text, parentId } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'Comment text required' });
 
-    const file = await File.findById(req.params.fileId);
+    const file = await File.findOne({ _id: req.params.fileId, userId: req.user._id, trashed: false });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     const comment = await Comment.create({

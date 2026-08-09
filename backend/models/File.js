@@ -32,6 +32,7 @@ const fileSchema = new mongoose.Schema({
   aiTags: [{ type: String }],
   aiRenamedFrom: { type: String, default: '' },
   ocrText: { type: String, default: '' },
+  textExtractionStatus: { type: String, enum: ['pending', 'complete', 'unsupported', 'failed'], default: 'pending' },
   description: { type: String, default: '' },
   labels: [{ type: String }],
   versions: [versionSchema],

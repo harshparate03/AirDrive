@@ -6,8 +6,10 @@ import api from '../services/api'
 import toast from 'react-hot-toast'
 import { useMutation } from '@tanstack/react-query'
 import ViewModeToggle from '../components/ui/ViewModeToggle'
+import { useSelector } from 'react-redux'
 
 const SharedPage = () => {
+  const { viewMode } = useSelector(state => state.ui)
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -59,14 +61,14 @@ const SharedPage = () => {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'space-y-3'}>
         {links.map((link, i) => (
           <motion.div
             key={link._id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.04 }}
-            className="card p-4 flex items-center gap-4"
+            className={`card p-4 flex gap-4 ${viewMode === 'grid' ? 'items-start flex-wrap' : 'items-center'}`}
           >
             <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
               <HiLink className="text-primary-500 text-xl" />

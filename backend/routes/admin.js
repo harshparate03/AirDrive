@@ -177,6 +177,10 @@ router.patch('/users/:id', async (req, res) => {
     const { role, isActive } = req.body;
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
+    if (role && !['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+    if (user._id.equals(req.user._id) && (role === 'user' || isActive === false)) {
+      return res.status(400).json({ error: 'You cannot remove your own admin access' });
+    }
 
     if (role) user.role = role;
     if (isActive !== undefined) user.isActive = isActive;

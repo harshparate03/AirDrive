@@ -13,7 +13,8 @@ const FilePreviewModal = () => {
   const [previewUrl, setPreviewUrl] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
   const mime = file?.mimeType || ''
-  const canPreview = mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime.startsWith('text/') || mime === 'application/pdf'
+  const canPreviewType = mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime.startsWith('text/') || mime === 'application/pdf'
+  const canPreview = canPreviewType && (file?.size || 0) <= 25 * 1024 * 1024
 
   useEffect(() => {
     let objectUrl = ''
@@ -66,7 +67,7 @@ const FilePreviewModal = () => {
     return (
       <div className="text-center space-y-3">
         <Icon className="text-8xl mx-auto text-dark-300" />
-        <p className="text-dark-500 text-sm">No preview available</p>
+        <p className="text-dark-500 text-sm">{canPreviewType && !canPreview ? 'Preview is disabled for files larger than 25 MB' : 'No preview available'}</p>
         {file.webViewLink && (
           <a href={file.webViewLink} target="_blank" rel="noreferrer" className="btn-primary inline-flex items-center gap-2">
             <HiExternalLink /> Open in Google Drive

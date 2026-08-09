@@ -11,12 +11,31 @@ const driveService = require('../services/googleDrive');
 const localService = require('../services/localStorage');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const { sanitizeRelativeDirectory } = require('../utils/uploadPaths');
 
 // Helper to get user's Google tokens
 const getTokens = (user) => ({
   accessToken: decrypt(user.googleAccessToken),
   refreshToken: decrypt(user.googleRefreshToken),
 });
+
+const ensureGoogleFolder = async (folder, user, tokens) => {
+  if (!folder || folder.googleFolderId) return folder;
+  let parentGoogleId = null;
+  if (folder.parentFolder) {
+    const parent = await Folder.findOne({ _id: folder.parentFolder, userId: user._id, trashed: false });
+    if (!parent) throw new Error('Parent folder not found');
+    await ensureGoogleFolder(parent, user, tokens);
+    parentGoogleId = parent.googleFolderId || null;
+  }
+  const driveFolder = await driveService.createDriveFolder(tokens.accessToken, tokens.refreshToken, {
+    name: folder.name,
+    parentFolderId: parentGoogleId,
+  });
+  folder.googleFolderId = driveFolder.id || '';
+  await folder.save();
+  return folder;
+};
 
 // GET /api/files - List files
 router.get('/', authenticate, async (req, res) => {
@@ -63,14 +82,58 @@ router.get('/', authenticate, async (req, res) => {
 // POST /api/files/upload - Upload file(s) to Google Drive (or local storage if not connected)
 router.post('/upload', authenticate, upload.array('files', 20), async (req, res) => {
   try {
-    const { folderId, googleDriveFolderId } = req.body;
+    const { folderId, relativePath = '' } = req.body;
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files provided' });
     }
+    const incomingSize = req.files.reduce((sum, item) => sum + item.size, 0);
+    if ((req.user.storageUsed || 0) + incomingSize > (req.user.storageLimit || 0)) {
+      return res.status(413).json({ error: 'Storage limit exceeded' });
+    }
 
     const useGoogle = !!(req.user.googleConnected && req.user.googleAccessToken && req.user.googleRefreshToken);
+    if (!useGoogle && process.env.NODE_ENV === 'production') {
+      return res.status(409).json({ error: 'Connect Google Drive before uploading so your files remain available' });
+    }
     const io = req.app.get('io');
     const uploadedFiles = [];
+
+    let destinationFolder = null;
+    if (folderId) {
+      destinationFolder = await Folder.findOne({ _id: folderId, userId: req.user._id, trashed: false });
+      if (!destinationFolder) return res.status(404).json({ error: 'Destination folder not found' });
+      if (useGoogle && !destinationFolder.googleFolderId) {
+        await ensureGoogleFolder(destinationFolder, req.user, getTokens(req.user));
+      }
+    }
+
+    const cleanParts = sanitizeRelativeDirectory(relativePath);
+    if (cleanParts.length) {
+      const tokens = useGoogle ? getTokens(req.user) : null;
+      for (const rawPart of cleanParts) {
+        const part = rawPart;
+        if (!part) continue;
+        let child = await Folder.findOne({ userId: req.user._id, parentFolder: destinationFolder?._id || null, name: part, trashed: false });
+        if (!child) {
+          let googleFolderId = '';
+          if (useGoogle) {
+            const driveFolder = await driveService.createDriveFolder(tokens.accessToken, tokens.refreshToken, {
+              name: part,
+              parentFolderId: destinationFolder?.googleFolderId || null,
+            });
+            googleFolderId = driveFolder.id || '';
+          }
+          child = await Folder.create({
+            userId: req.user._id,
+            name: part,
+            parentFolder: destinationFolder?._id || null,
+            path: destinationFolder ? [...(destinationFolder.path || []), destinationFolder._id] : [],
+            googleFolderId,
+          });
+        }
+        destinationFolder = child;
+      }
+    }
 
     for (const file of req.files) {
       const ext = path.extname(file.originalname).toLowerCase();
@@ -88,7 +151,7 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
           name: file.originalname,
           mimeType: file.mimetype,
           buffer: file.buffer,
-          folderId: googleDriveFolderId || null,
+          folderId: destinationFolder?.googleFolderId || null,
         });
         googleFileId = driveFile.id || '';
         thumbnail = driveFile.thumbnailLink || '';
@@ -106,7 +169,7 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
         storageType: useGoogle ? 'google' : 'local',
         localPath,
         userId: req.user._id,
-        folderId: folderId || null,
+        folderId: destinationFolder?._id || null,
         name: file.originalname,
         originalName: file.originalname,
         mimeType: file.mimetype,
@@ -129,6 +192,18 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
       await User.findByIdAndUpdate(req.user._id, { $inc: { storageUsed: file.size } });
 
       uploadedFiles.push(fileMeta);
+
+      if (/^(text\/|application\/pdf)|wordprocessingml/.test(fileMeta.mimeType)) {
+        setImmediate(async () => {
+          try {
+            const freshFile = await File.findById(fileMeta._id);
+            const freshUser = await User.findById(req.user._id);
+            await require('../services/textExtraction').ensureFileText(freshFile, freshUser);
+          } catch (error) {
+            console.error(`Text indexing failed for ${fileMeta._id}:`, error.message);
+          }
+        });
+      }
 
       // Log activity
       await logActivity({
@@ -307,8 +382,13 @@ router.post('/move', authenticate, async (req, res) => {
     const file = await File.findOne({ _id: fileId, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
-    const newFolder = newFolderId ? await Folder.findById(newFolderId) : null;
-    const oldFolder = oldFolderId ? await Folder.findById(oldFolderId) : null;
+    const newFolder = newFolderId
+      ? await Folder.findOne({ _id: newFolderId, userId: req.user._id, trashed: false })
+      : null;
+    const oldFolder = oldFolderId
+      ? await Folder.findOne({ _id: oldFolderId, userId: req.user._id })
+      : null;
+    if (newFolderId && !newFolder) return res.status(404).json({ error: 'Destination folder not found' });
 
     // Only move in Google Drive for Google-stored files in a Google folder
     if (file.storageType === 'google' && file.googleFileId && newFolder?.googleFolderId) {

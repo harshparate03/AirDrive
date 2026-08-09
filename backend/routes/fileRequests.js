@@ -48,12 +48,11 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:token', optionalAuth, async (req, res) => {
   try {
     const request = await FileRequest.findOne({ token: req.params.token, isActive: true })
-      .populate('userId', 'name photo')
-      .lean();
+      .populate('userId', 'name photo');
     if (!request) return res.status(404).json({ error: 'Request not found' });
-    if (request.isExpired?.()) return res.status(410).json({ error: 'Request expired' });
+    if (request.isExpired()) return res.status(410).json({ error: 'Request expired' });
 
-    res.json({ request });
+    res.json({ request: request.toObject() });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch request' });
   }
@@ -72,46 +71,63 @@ router.post('/:token/upload', upload.array('files', 20), async (req, res) => {
       return res.status(400).json({ error: `Max ${request.maxFiles} files allowed` });
     }
 
+    const oversized = req.files.find(file => file.size > request.maxSizeMB * 1024 * 1024);
+    if (oversized) return res.status(400).json({ error: `File ${oversized.originalname} exceeds ${request.maxSizeMB}MB limit` });
+    if (request.allowedTypes.length > 0) {
+      const disallowed = req.files.find(file => !request.allowedTypes.some(type =>
+        file.mimetype === type || file.mimetype.startsWith(`${type.replace(/\/$/, '')}/`)
+      ));
+      if (disallowed) return res.status(400).json({ error: `File type ${disallowed.mimetype} is not allowed` });
+    }
+
     // Get owner's tokens
     const User = require('../models/User');
     const owner = await User.findById(request.userId);
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
+    if (!owner.googleConnected || !owner.googleAccessToken || !owner.googleRefreshToken) {
+      return res.status(409).json({ error: 'The request owner must connect Google Drive before receiving files' });
+    }
 
     const accessToken = decrypt(owner.googleAccessToken);
     const refreshToken = decrypt(owner.googleRefreshToken);
 
     const uploaded = [];
-    for (const file of req.files) {
-      // Check size
-      if (file.size > request.maxSizeMB * 1024 * 1024) {
-        return res.status(400).json({ error: `File ${file.originalname} exceeds ${request.maxSizeMB}MB limit` });
+    try {
+      const destination = request.folderId
+        ? await require('../models/Folder').findOne({ _id: request.folderId, userId: owner._id, trashed: false })
+        : null;
+      if (request.folderId && !destination) return res.status(404).json({ error: 'Destination folder no longer exists' });
+
+      for (const file of req.files) {
+        const driveFile = await driveService.uploadFile(accessToken, refreshToken, {
+          name: file.originalname,
+          mimeType: file.mimetype,
+          buffer: file.buffer,
+          folderId: destination?.googleFolderId || null,
+        });
+
+        const uploadRecord = {
+          name: file.originalname,
+          size: file.size,
+          mimeType: file.mimetype,
+          googleFileId: driveFile.id,
+          uploaderEmail: req.body.email || 'anonymous',
+        };
+        uploaded.push(uploadRecord);
       }
-
-      const driveFile = await driveService.uploadFile(accessToken, refreshToken, {
-        name: file.originalname,
-        mimeType: file.mimetype,
-        buffer: file.buffer,
-      });
-
-      const uploadRecord = {
-        name: file.originalname,
-        size: file.size,
-        mimeType: file.mimetype,
-        googleFileId: driveFile.id,
-        uploaderEmail: req.body.email || 'anonymous',
-      };
-      request.uploads.push(uploadRecord);
-      uploaded.push(uploadRecord);
+    } catch (uploadError) {
+      await Promise.allSettled(uploaded.map(item => driveService.deleteFile(accessToken, refreshToken, item.googleFileId)));
+      throw uploadError;
     }
+
+    request.uploads.push(...uploaded);
 
     request.accessCount += 1;
     await request.save();
 
     // Notify owner
-    const io = global.io;
-    const Notification = require('../models/Notification');
-    await Notification.create({
-      userId: request.userId,
+    const { createNotification } = require('../utils/activityLogger');
+    await createNotification(req.app.get('io'), request.userId, {
       type: 'upload',
       title: 'Files Received',
       message: `${req.files.length} file(s) uploaded to your request "${request.title}"`,

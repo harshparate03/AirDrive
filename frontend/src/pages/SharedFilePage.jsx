@@ -1,16 +1,18 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { HiDownload, HiLockClosed, HiFolder, HiExternalLink, HiCloudUpload, HiEye } from 'react-icons/hi'
-import api, { shareDownload, sharePreviewUrl } from '../services/api'
+import api, { shareDownload, sharePreview } from '../services/api'
 import { getFileIcon, formatFileSize } from '../utils/fileUtils'
+import toast from 'react-hot-toast'
 
 const SharedFilePage = () => {
   const { token } = useParams()
   const [password, setPassword] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState('')
+  const [previewUrl, setPreviewUrl] = useState('')
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['shared', token, password],
@@ -30,6 +32,26 @@ const SharedFilePage = () => {
 
   const shareLink = data?.shareLink
   const content = data?.content
+
+  useEffect(() => {
+    let objectUrl = ''
+    let cancelled = false
+    if (!content?.file || content.file.size > 25 * 1024 * 1024 || (!password && error)) return undefined
+    const mime = content.file.mimeType || ''
+    const previewable = ['image/', 'video/', 'audio/'].some(prefix => mime.startsWith(prefix)) || mime === 'application/pdf'
+    if (!previewable) return undefined
+    sharePreview(token, password)
+      .then(response => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(new Blob([response.data], { type: mime }))
+        setPreviewUrl(objectUrl)
+      })
+      .catch(() => toast.error('Preview could not be loaded'))
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [content?.file?._id, content?.file?.mimeType, token, password, error])
 
   if (isExpired) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950">
@@ -52,7 +74,7 @@ const SharedFilePage = () => {
     </div>
   )
 
-  if (needsPassword || (error?.response?.status === 401 && !password)) return (
+  if (needsPassword || error?.response?.status === 401) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-900 via-dark-900 to-dark-950 p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -75,7 +97,7 @@ const SharedFilePage = () => {
             className="input"
             autoFocus
           />
-          {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
+          {(passwordError || error?.response?.data?.error) && <p className="text-sm text-red-500">{passwordError || error.response.data.error}</p>}
           <button type="submit" className="btn-primary w-full">Access File</button>
         </form>
       </motion.div>
@@ -154,11 +176,12 @@ const SharedFilePage = () => {
                     a.download = content.file.name
                     a.click()
                     URL.revokeObjectURL(url)
-                  } catch {
-                    if (content.file.webContentLink) window.open(content.file.webContentLink)
+                  } catch (downloadError) {
+                    toast.error(downloadError.response?.data?.error || 'Download failed')
                   }
                 }}
-                className="btn-primary flex items-center justify-center gap-2"
+                disabled={shareLink?.downloadDisabled}
+                className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <HiDownload /> Download File
               </button>
@@ -168,7 +191,7 @@ const SharedFilePage = () => {
             {content?.file && (
               <button
                 type="button"
-                onClick={() => window.open(sharePreviewUrl(token, password), '_blank')}
+                onClick={() => previewUrl ? window.open(previewUrl, '_blank', 'noopener,noreferrer') : toast.error('Preview is still loading')}
                 className="btn-secondary flex items-center justify-center gap-2"
               >
                 <HiEye /> Preview File
@@ -177,25 +200,25 @@ const SharedFilePage = () => {
           </div>
 
           {/* Inline embedded preview */}
-          {content?.file && (['image/', 'video/', 'audio/'].some(p => content.file.mimeType.startsWith(p)) || content.file.mimeType === 'application/pdf') && (
+          {content?.file && previewUrl && (['image/', 'video/', 'audio/'].some(p => content.file.mimeType.startsWith(p)) || content.file.mimeType === 'application/pdf') && (
             <div className="mt-5">
               <p className="text-xs font-semibold text-dark-500 uppercase tracking-wider mb-2">Preview</p>
               {content.file.mimeType.startsWith('image/') && (
                 <img
-                  src={sharePreviewUrl(token, password)}
+                  src={previewUrl}
                   alt={content.file.name}
                   className="w-full max-h-80 object-contain rounded-xl bg-slate-50 dark:bg-dark-800"
                 />
               )}
               {content.file.mimeType.startsWith('video/') && (
-                <video controls className="w-full max-h-80 rounded-xl bg-black" src={sharePreviewUrl(token, password)} />
+                <video controls className="w-full max-h-80 rounded-xl bg-black" src={previewUrl} />
               )}
               {content.file.mimeType.startsWith('audio/') && (
-                <audio controls className="w-full" src={sharePreviewUrl(token, password)} />
+                <audio controls className="w-full" src={previewUrl} />
               )}
               {content.file.mimeType === 'application/pdf' && (
                 <iframe
-                  src={sharePreviewUrl(token, password)}
+                  src={previewUrl}
                   title={content.file.name}
                   className="w-full h-80 rounded-xl border border-slate-100 dark:border-dark-700"
                 />
@@ -217,6 +240,17 @@ const SharedFilePage = () => {
                   </div>
                 )
               })}
+            </div>
+          )}
+          {content?.folders?.length > 0 && (
+            <div className="mt-5 space-y-2">
+              <p className="text-xs font-semibold text-dark-500 uppercase tracking-wider">Subfolders</p>
+              {content.folders.map(folder => (
+                <div key={folder._id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5 dark:bg-dark-800">
+                  <HiFolder className="text-amber-400" />
+                  <span className="truncate text-sm text-dark-700 dark:text-dark-200">{folder.name}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

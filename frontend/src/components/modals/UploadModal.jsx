@@ -93,7 +93,7 @@ const UploadModal = () => {
               <p className="font-medium text-dark-700 dark:text-dark-200">
                 {dragOver ? 'Drop here' : 'Drag & drop or click to browse'}
               </p>
-              <p className="text-sm text-dark-400">All file types · Up to 5 GB each</p>
+              <p className="text-sm text-dark-400">All file types · Up to 100 MB each</p>
             </motion.div>
           </div>
 

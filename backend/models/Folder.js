@@ -4,6 +4,7 @@ const folderSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
   parentFolder: { type: mongoose.Schema.Types.ObjectId, ref: 'Folder', default: null },
+  googleFolderId: { type: String, default: '' },
   color: { type: String, default: '#6366f1' },
   icon: { type: String, default: 'folder' },
   pinned: { type: Boolean, default: false },

@@ -110,12 +110,36 @@ router.delete('/account', authenticate, async (req, res) => {
     const File = require('../models/File');
     const Folder = require('../models/Folder');
 
-    // Cascade delete all user data
+    const [files, account] = await Promise.all([
+      File.find({ userId: req.user._id }),
+      User.findById(req.user._id),
+    ]);
+    const accessToken = account?.googleAccessToken ? decrypt(account.googleAccessToken) : '';
+    const refreshToken = account?.googleRefreshToken ? decrypt(account.googleRefreshToken) : '';
+    for (const file of files) {
+      if (file.storageType === 'google' && file.googleFileId && accessToken) {
+        await driveService.deleteFile(accessToken, refreshToken, file.googleFileId);
+      } else if (file.localPath) {
+        await require('../services/localStorage').deleteFile(file.localPath);
+      }
+    }
+
+    const fileIds = files.map(file => file._id);
+    const folders = await Folder.find({ userId: req.user._id });
+    for (const folder of folders.reverse()) {
+      if (folder.googleFolderId && accessToken) await driveService.deleteFile(accessToken, refreshToken, folder.googleFolderId).catch(() => {});
+    }
+
+    // Cascade delete all application data
     await Promise.all([
       File.deleteMany({ userId: req.user._id }),
       Folder.deleteMany({ userId: req.user._id }),
       Activity.deleteMany({ userId: req.user._id }),
       require('../models/Notification').deleteMany({ userId: req.user._id }),
+      require('../models/SharedLink').deleteMany({ userId: req.user._id }),
+      require('../models/FileRequest').deleteMany({ userId: req.user._id }),
+      require('../models/AIHistory').deleteMany({ userId: req.user._id }),
+      require('../models/Comment').deleteMany({ $or: [{ userId: req.user._id }, { fileId: { $in: fileIds } }] }),
       User.findByIdAndDelete(req.user._id),
     ]);
 

@@ -6,6 +6,7 @@ const AIHistory = require('../models/AIHistory');
 const { decrypt } = require('../utils/encryption');
 const { logActivity: logActivityFn, getClientInfo: getClientInfoFn } = require('../utils/activityLogger');
 const driveService = require('../services/googleDrive');
+const { ensureFileText } = require('../services/textExtraction');
 const OpenAI = require('openai');
 
 const getOpenAI = () => new OpenAI({
@@ -32,6 +33,7 @@ router.post('/chat', authenticate, async (req, res) => {
     if (fileId) {
       const file = await File.findOne({ _id: fileId, userId: req.user._id });
       if (file) {
+        await ensureFileText(file, req.user).catch(() => '');
         fileContext = `\nFile: ${file.name}\nType: ${file.mimeType}\nSize: ${file.size} bytes`;
         if (file.ocrText) fileContext += `\nContent:\n${file.ocrText.substring(0, 8000)}`;
         systemPrompt = `You are Air Drive AI. You are analyzing a file: ${file.name}. ${fileContext}`;
@@ -80,7 +82,8 @@ router.post('/summary', authenticate, async (req, res) => {
     const file = await File.findOne({ _id: fileId, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
-    const content = file.ocrText || `File: ${file.name}`;
+    const extractedText = await ensureFileText(file, req.user).catch(() => '');
+    const content = extractedText || `File: ${file.name}\nType: ${file.mimeType}`;
     const openai = getOpenAI();
 
     const prompts = {
@@ -126,6 +129,7 @@ router.post('/tags', authenticate, async (req, res) => {
     const file = await File.findOne({ _id: fileId, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
+    await ensureFileText(file, req.user).catch(() => '');
     const openai = getOpenAI();
     const content = `Filename: ${file.name}\nType: ${file.mimeType}\nOCR Text: ${(file.ocrText || '').substring(0, 2000)}`;
 
@@ -183,7 +187,8 @@ router.post('/rename', authenticate, async (req, res) => {
     const file = await File.findOne({ _id: fileId, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
-const openai = getOpenAI();
+    await ensureFileText(file, req.user).catch(() => '');
+    const openai = getOpenAI();
     const tags = Array.isArray(file.aiTags) ? file.aiTags.join(', ') : '';
     const content = `Current name: ${file.name}\nType: ${file.mimeType}\nCategory: ${file.category || 'other'}\nTags: ${tags}\nOCR preview: ${(file.ocrText || '').substring(0, 500)}`;
 
@@ -334,6 +339,7 @@ router.post('/duplicates', authenticate, async (req, res) => {
 router.post('/smart-search', authenticate, async (req, res) => {
   try {
     const { query } = req.body;
+    if (!query?.trim()) return res.status(400).json({ error: 'Search query required' });
     const openai = getOpenAI();
 
     // Ask AI to convert natural language to search params
@@ -351,18 +357,22 @@ router.post('/smart-search', authenticate, async (req, res) => {
 
     // Build MongoDB query
     const dbQuery = { userId: req.user._id, trashed: false };
-    if (params.name) dbQuery.name = { $regex: params.name, $options: 'i' };
-    if (params.category) dbQuery.category = params.category;
+    const escapeRegex = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 200);
+    if (params.name) dbQuery.name = { $regex: escapeRegex(params.name), $options: 'i' };
+    const categories = ['image', 'video', 'audio', 'document', 'spreadsheet', 'presentation', 'pdf', 'archive', 'code', 'other'];
+    if (categories.includes(params.category)) dbQuery.category = params.category;
     if (params.tags?.length) dbQuery.aiTags = { $in: params.tags };
-    if (params.dateRange?.from) dbQuery.createdAt = { $gte: new Date(params.dateRange.from) };
-    if (params.dateRange?.to) {
-      dbQuery.createdAt = { ...dbQuery.createdAt, $lte: new Date(params.dateRange.to) };
+    const fromDate = params.dateRange?.from ? new Date(params.dateRange.from) : null;
+    const toDate = params.dateRange?.to ? new Date(params.dateRange.to) : null;
+    if (fromDate && !Number.isNaN(fromDate.getTime())) dbQuery.createdAt = { $gte: fromDate };
+    if (toDate && !Number.isNaN(toDate.getTime())) {
+      dbQuery.createdAt = { ...dbQuery.createdAt, $lte: toDate };
     }
     if (params.searchText) {
       dbQuery.$or = [
-        { name: { $regex: params.searchText, $options: 'i' } },
-        { ocrText: { $regex: params.searchText, $options: 'i' } },
-        { aiTags: { $in: [new RegExp(params.searchText, 'i')] } },
+        { name: { $regex: escapeRegex(params.searchText), $options: 'i' } },
+        { ocrText: { $regex: escapeRegex(params.searchText), $options: 'i' } },
+        { aiTags: { $in: [new RegExp(escapeRegex(params.searchText), 'i')] } },
       ];
     }
 
@@ -388,22 +398,8 @@ router.post('/ocr', authenticate, async (req, res) => {
     const file = await File.findOne({ _id: fileId, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
-    const { accessToken, refreshToken } = getTokens(req.user);
-    const buffer = await driveService.downloadFile(accessToken, refreshToken, file.googleFileId);
-
-    let text = '';
-
-    if (file.mimeType.startsWith('image/')) {
-      const Tesseract = require('tesseract.js');
-      const { data: { text: ocrText } } = await Tesseract.recognize(buffer, 'eng');
-      text = ocrText;
-    } else if (file.mimeType === 'application/pdf') {
-      // Simple text extraction fallback
-      text = `PDF content from ${file.name} - Full OCR requires PDF.js integration`;
-    }
-
-    file.ocrText = text;
-    await file.save();
+    file.textExtractionStatus = 'pending';
+    const text = await ensureFileText(file, req.user);
 
     res.json({ text, fileId, fileName: file.name });
   } catch (error) {

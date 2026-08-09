@@ -3,6 +3,7 @@ import {
   HiCode, HiArchive, HiTable, HiPresentationChartBar,
   HiDocumentText,
 } from 'react-icons/hi'
+export { formatFileSize, getFileExtension } from './formatters'
 
 export const getFileIcon = (mimeType = '') => {
   if (mimeType.startsWith('image/')) return HiPhotograph
@@ -31,18 +32,6 @@ export const getFileColor = (category = '') => {
     other: 'bg-slate-100 dark:bg-slate-800',
   }
   return colors[category] || colors.other
-}
-
-export const formatFileSize = (bytes) => {
-  if (!bytes || bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
-}
-
-export const getFileExtension = (filename = '') => {
-  return filename.split('.').pop()?.toLowerCase() || ''
 }
 
 export const isPreviewable = (mimeType = '') => {
