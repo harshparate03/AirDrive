@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const User = require('../models/User');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/jwt');
@@ -186,6 +187,8 @@ router.post('/forgot-password', async (req, res) => {
     user.passwordResetOTP = otpHash;
     user.passwordResetOTPExpires = expires;
     user.passwordResetAttempts = 0;
+    user.passwordResetToken = null;
+    user.passwordResetTokenExpires = null;
     await user.save();
 
     try {
@@ -233,7 +236,8 @@ router.post('/verify-otp', async (req, res) => {
     user.passwordResetOTP = null;
     user.passwordResetOTPExpires = null;
     user.passwordResetAttempts = 0;
-    user.emailVerifyToken = resetToken; // reuse field to store reset token
+    user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.passwordResetTokenExpires = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
     res.json({ resetToken });
@@ -254,13 +258,19 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+emailVerifyToken');
-    if (!user || user.emailVerifyToken !== resetToken) {
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      passwordResetToken: resetTokenHash,
+      passwordResetTokenExpires: { $gt: new Date() },
+    }).select('+passwordResetToken +passwordResetTokenExpires');
+    if (!user) {
       return res.status(400).json({ error: 'Invalid or expired reset token' });
     }
 
     user.password = newPassword;
-    user.emailVerifyToken = null;
+    user.passwordResetToken = null;
+    user.passwordResetTokenExpires = null;
     user.passwordResetOTP = null;
     user.passwordResetOTPExpires = null;
     user.refreshToken = ''; // invalidate existing sessions
