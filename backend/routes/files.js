@@ -12,6 +12,7 @@ const localService = require('../services/localStorage');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const { sanitizeRelativeDirectory } = require('../utils/uploadPaths');
+const { ensureFileText } = require('../services/textExtraction');
 
 // Helper to get user's Google tokens
 const getTokens = (user) => ({
@@ -198,7 +199,7 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
           try {
             const freshFile = await File.findById(fileMeta._id);
             const freshUser = await User.findById(req.user._id);
-            await require('../services/textExtraction').ensureFileText(freshFile, freshUser);
+            await ensureFileText(freshFile, freshUser);
           } catch (error) {
             console.error(`Text indexing failed for ${fileMeta._id}:`, error.message);
           }
@@ -554,6 +555,47 @@ router.post('/:id/restore-version', authenticate, async (req, res) => {
     res.json({ file });
   } catch (error) {
     res.status(500).json({ error: 'Failed to restore version' });
+  }
+});
+
+// GET /api/files/:id/preview-info - Resolve extracted text or an external viewer
+router.get('/:id/preview-info', authenticate, async (req, res) => {
+  try {
+    const file = await File.findOne({ _id: req.params.id, userId: req.user._id, trashed: false });
+    if (!file) return res.status(404).json({ error: 'File not found' });
+
+    let webViewLink = file.webViewLink || '';
+    if (file.storageType === 'google' && file.googleFileId) {
+      try {
+        const { accessToken, refreshToken } = getTokens(req.user);
+        const metadata = await driveService.getFileMetadata(accessToken, refreshToken, file.googleFileId);
+        webViewLink = metadata.webViewLink || webViewLink;
+        if (webViewLink !== file.webViewLink) {
+          file.webViewLink = webViewLink;
+          await file.save();
+        }
+      } catch (_) {}
+    }
+
+    let text = file.ocrText || '';
+    const mimeType = file.mimeType || '';
+    const extension = (file.extension || '').toLowerCase();
+    const textCapable = mimeType.startsWith('text/') || mimeType === 'application/pdf' ||
+      mimeType.includes('wordprocessingml') || ['.txt', '.md', '.csv', '.json', '.xml', '.docx'].includes(extension);
+    if (!text && textCapable && file.textExtractionStatus !== 'unsupported') {
+      text = await ensureFileText(file, req.user).catch(() => '');
+    }
+
+    res.json({
+      preview: {
+        text: text.slice(0, 50000),
+        webViewLink,
+        canOpenExternally: Boolean(webViewLink),
+        fallback: webViewLink ? 'google-drive' : 'download',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to prepare file preview' });
   }
 });
 

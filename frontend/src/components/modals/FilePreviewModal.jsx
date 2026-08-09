@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useSelector, useDispatch } from 'react-redux'
 import { HiX, HiDownload, HiShare, HiStar, HiExternalLink } from 'react-icons/hi'
 import { closeModal } from '../../store/slices/uiSlice'
-import { downloadFile } from '../../services/api'
+import api, { downloadFile } from '../../services/api'
 import { getFileIcon, formatFileSize } from '../../utils/fileUtils'
 import toast from 'react-hot-toast'
 
@@ -12,6 +12,7 @@ const FilePreviewModal = () => {
   const { modalData: file } = useSelector(state => state.ui)
   const [previewUrl, setPreviewUrl] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewInfo, setPreviewInfo] = useState(null)
   const mime = file?.mimeType || ''
   const canPreviewType = mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime.startsWith('text/') || mime === 'application/pdf'
   const canPreview = canPreviewType && (file?.size || 0) <= 25 * 1024 * 1024
@@ -34,6 +35,13 @@ const FilePreviewModal = () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }, [file?._id, file?.mimeType, canPreview])
+
+  useEffect(() => {
+    if (!file?._id) return
+    api.get(`/files/${file._id}/preview-info`)
+      .then(response => setPreviewInfo(response.data.preview))
+      .catch(() => setPreviewInfo({ fallback: 'download', text: '', webViewLink: '' }))
+  }, [file?._id])
 
   if (!file) return null
 
@@ -64,15 +72,26 @@ const FilePreviewModal = () => {
       return <iframe src={previewUrl} title={file.name} className="w-full h-[60vh] rounded-xl border border-slate-200 bg-white" />
     }
 
+    if (previewInfo?.text) {
+      return (
+        <div className="w-full max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 text-left text-sm leading-6 text-dark-700 whitespace-pre-wrap dark:border-dark-700 dark:bg-dark-800 dark:text-dark-200">
+          {previewInfo.text}
+        </div>
+      )
+    }
+
     return (
       <div className="text-center space-y-3">
         <Icon className="text-8xl mx-auto text-dark-300" />
-        <p className="text-dark-500 text-sm">{canPreviewType && !canPreview ? 'Preview is disabled for files larger than 25 MB' : 'No preview available'}</p>
-        {file.webViewLink && (
-          <a href={file.webViewLink} target="_blank" rel="noreferrer" className="btn-primary inline-flex items-center gap-2">
-            <HiExternalLink /> Open in Google Drive
-          </a>
-        )}
+        <p className="text-dark-500 text-sm">{canPreviewType && !canPreview ? 'This large file opens with its storage viewer.' : 'This format opens with Google Drive or downloads to your device.'}</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {(previewInfo?.webViewLink || file.webViewLink) && (
+            <a href={previewInfo?.webViewLink || file.webViewLink} target="_blank" rel="noreferrer" className="btn-primary inline-flex items-center gap-2">
+              <HiExternalLink /> Open File
+            </a>
+          )}
+          <button onClick={handleDownload} className="btn-secondary inline-flex items-center gap-2"><HiDownload /> Download File</button>
+        </div>
       </div>
     )
   }
@@ -84,7 +103,7 @@ const FilePreviewModal = () => {
       const a = document.createElement('a')
       a.href = url; a.download = file.name; a.click()
       URL.revokeObjectURL(url)
-    } catch { if (file.webContentLink) window.open(file.webContentLink) }
+    } catch { toast.error('File could not be downloaded. Re-upload it if it was stored before persistent Drive storage was enabled.') }
   }
 
   return (
