@@ -34,12 +34,18 @@ import PageLoader from './components/ui/PageLoader'
 import { initTheme } from './components/ui/ThemePicker'
 
 // Guards
-const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, initialized } = useSelector(state => state.auth)
-  if (!initialized) return <div className="flex items-center justify-center h-screen">
-    <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-  </div>
-  return isAuthenticated ? children : <Navigate to="/login" replace />
+const UserRoute = ({ children }) => {
+  const { user, isAuthenticated, initialized } = useSelector(state => state.auth)
+  if (!initialized) return <div className="flex h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" /></div>
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return user?.role === 'admin' ? <Navigate to="/admin" replace /> : children
+}
+
+const AdminRoute = ({ children }) => {
+  const { user, isAuthenticated, initialized } = useSelector(state => state.auth)
+  if (!initialized) return <div className="flex h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" /></div>
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return user?.role === 'admin' ? children : <Navigate to="/dashboard" replace />
 }
 
 const PublicRoute = ({ children }) => {
@@ -116,9 +122,9 @@ return (
 
         {/* Private routes */}
         <Route path="/" element={
-          <PrivateRoute>
+          <UserRoute>
             <MainLayout />
-          </PrivateRoute>
+          </UserRoute>
         }>
           <Route index element={<AuthenticatedHome />} />
           <Route path="dashboard" element={<DashboardPage />} />
@@ -136,15 +142,15 @@ return (
         </Route>
 
         <Route path="/admin" element={
-          <PrivateRoute><AdminPage /></PrivateRoute>
+          <AdminRoute><AdminPage /></AdminRoute>
         } />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<AuthenticatedHome />} />
       </Routes>
 
       {/* Global onboarding tour — shown once after first login */}
-      {isAuthenticated && <OnboardingTour />}
+      {isAuthenticated && user?.role !== 'admin' && <OnboardingTour />}
     </>
   )
 }

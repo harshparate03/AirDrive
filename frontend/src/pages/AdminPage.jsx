@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   HiUsers, HiDatabase, HiChartBar, HiShieldCheck,
   HiSpeakerphone, HiRefresh, HiExclamation, HiBell, HiUserCircle, HiChevronRight,
-  HiHome, HiLogout, HiMenu, HiX, HiMoon, HiSun, HiExternalLink,
+  HiHome, HiLogout, HiMenu, HiX, HiMoon, HiSun,
   HiCog, HiUser,
   HiLightningBolt, HiShare,
 } from 'react-icons/hi'
@@ -34,15 +34,19 @@ const AdminPage = () => {
 
   if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
 
-  const { data: dashData, isLoading } = useQuery({
+  const { data: dashData } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => api.get('/admin/dashboard').then(r => r.data),
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   })
 
-  const { data: usersData } = useQuery({
+  const { data: usersData, isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useQuery({
     queryKey: ['admin-users', userPage, userSearch],
     queryFn: () => api.get('/admin/users', { params: { page: userPage, search: userSearch || undefined } }).then(r => r.data),
     enabled: activeTab === 'users',
+    refetchInterval: activeTab === 'users' ? 15000 : false,
+    refetchOnWindowFocus: true,
   })
 
   const announceMutation = useMutation({
@@ -53,7 +57,12 @@ const AdminPage = () => {
 
   const toggleUserMutation = useMutation({
     mutationFn: ({ id, ...changes }) => api.patch(`/admin/users/${id}`, changes),
-    onSuccess: () => queryClient.invalidateQueries(['admin-users']),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] })
+      toast.success('User updated')
+    },
+    onError: error => toast.error(error.response?.data?.error || 'Failed to update user'),
   })
 
   const stats = [
@@ -111,9 +120,6 @@ const AdminPage = () => {
         ))}
       </nav>
       <div className="border-t border-white/10 p-4">
-        <button onClick={() => navigate('/dashboard')} className="mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 hover:bg-white/5 hover:text-white">
-          <HiExternalLink /> View user application
-        </button>
         <button onClick={handleAdminLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-rose-400 hover:bg-rose-500/10">
           <HiLogout /> Sign out
         </button>
@@ -232,8 +238,15 @@ const AdminPage = () => {
           <div className="p-4 border-b border-slate-100 dark:border-dark-700 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-dark-700 dark:text-dark-200">All Users ({usersData?.total || 0})</h2>
             <input value={userSearch} onChange={e => { setUserSearch(e.target.value); setUserPage(1) }} placeholder="Search users" className="input max-w-52 py-1.5 text-sm" />
-            <button onClick={() => queryClient.invalidateQueries(['admin-users'])} className="btn-ghost p-2"><HiRefresh /></button>
+            <button onClick={() => refetchUsers()} className="btn-ghost p-2" aria-label="Refresh users"><HiRefresh /></button>
           </div>
+          {usersLoading && <div className="p-8 text-center text-sm text-dark-400">Loading users...</div>}
+          {usersError && (
+            <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+              User Management could not be loaded. <button onClick={() => refetchUsers()} className="font-semibold underline">Try again</button>
+            </div>
+          )}
+          {!usersLoading && !usersError && usersData?.users?.length === 0 && <div className="p-8 text-center text-sm text-dark-400">No users found</div>}
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-3' : 'divide-y divide-slate-50 dark:divide-dark-700'}>
             {usersData?.users?.map(u => (
               <div key={u._id} className={`flex items-center gap-4 p-4 ${viewMode === 'grid' ? 'rounded-xl border border-slate-100 dark:border-dark-700' : ''}`}>
