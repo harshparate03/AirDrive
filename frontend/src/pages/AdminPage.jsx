@@ -5,6 +5,7 @@ import {
   HiUsers, HiDatabase, HiChartBar, HiShieldCheck,
   HiSpeakerphone, HiRefresh, HiExclamation, HiBell, HiUserCircle, HiChevronRight,
   HiHome, HiLogout, HiMenu, HiX, HiMoon, HiSun, HiExternalLink,
+  HiCog, HiUser,
 } from 'react-icons/hi'
 import { useDispatch, useSelector } from 'react-redux'
 import { Navigate, useNavigate } from 'react-router-dom'
@@ -14,6 +15,8 @@ import { formatFileSize } from '../utils/fileUtils'
 import ViewModeToggle from '../components/ui/ViewModeToggle'
 import { logoutUser } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
+import AdminAnalytics from '../components/admin/AdminAnalytics'
+import { AdminProfile, AdminSettings } from '../components/admin/AdminProfileSettings'
 
 const AdminPage = () => {
   const dispatch = useDispatch()
@@ -64,6 +67,8 @@ const AdminPage = () => {
     { id: 'announce', label: 'Announcements', icon: HiSpeakerphone },
     { id: 'notifications', label: 'Admin Alerts', icon: HiBell },
     { id: 'logs', label: 'System Logs', icon: HiChartBar },
+    { id: 'profile', label: 'Admin Profile', icon: HiUser },
+    { id: 'settings', label: 'Settings', icon: HiCog },
   ]
 
   const activeTabLabel = tabs.find(tab => tab.id === activeTab)?.label || 'Overview'
@@ -180,6 +185,8 @@ const AdminPage = () => {
               </motion.div>
             ))}
           </div>
+
+          <AdminAnalytics dashboard={dashData} />
 
           {/* Storage by category */}
           {dashData?.storageStats?.length > 0 && (
@@ -301,6 +308,8 @@ const AdminPage = () => {
       {activeTab === 'logs' && (
         <SystemLogs />
       )}
+      {activeTab === 'profile' && <AdminProfile />}
+      {activeTab === 'settings' && <AdminSettings />}
         </main>
       </div>
     </div>
