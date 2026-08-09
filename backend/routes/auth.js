@@ -43,6 +43,7 @@ const issueTokens = async (user, clientInfo, isNewUser, io) => {
     const adminIds = await User.find({ role: 'admin', isActive: true }).select('_id').lean();
     for (const admin of adminIds) {
       await createNotification(io, admin._id, {
+        audience: 'admin',
         type: 'system',
         title: isNewUser ? 'New User Registered' : 'User Login',
         message: `${user.name} (${user.email}) ${isNewUser ? 'signed up' : 'logged in'} from ${clientInfo.ip}`,

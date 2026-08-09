@@ -13,7 +13,8 @@ const createNotification = async (io, userId, notification) => {
   try {
     const notif = await Notification.create({ userId, ...notification });
     if (io) {
-      io.to(`user:${userId}`).emit('notification', notif);
+      const eventName = notif.audience === 'admin' ? 'admin-notification' : 'notification';
+      io.to(`user:${userId}`).emit(eventName, notif);
     }
     return notif;
   } catch (err) {
