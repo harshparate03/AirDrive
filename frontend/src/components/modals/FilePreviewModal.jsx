@@ -5,7 +5,7 @@ import { HiX, HiDownload, HiShare, HiStar, HiExternalLink } from 'react-icons/hi
 import { closeModal } from '../../store/slices/uiSlice'
 import api, { downloadFile } from '../../services/api'
 import { getFileIcon, formatFileSize } from '../../utils/fileUtils'
-import { openFileResponse, saveFileResponse } from '../../utils/fileActions'
+import { saveFileResponse } from '../../utils/fileActions'
 import toast from 'react-hot-toast'
 
 const FilePreviewModal = () => {
@@ -88,9 +88,9 @@ const FilePreviewModal = () => {
           <p className="text-red-500 text-sm">This legacy file is no longer present in storage. Please upload it again.</p>
         ) : (
           <>
-            <p className="text-dark-500 text-sm">{canPreviewType && !canPreview ? 'This large file opens with its storage viewer.' : 'This format opens with Google Drive or downloads to your device.'}</p>
+            <p className="text-dark-500 text-sm">{canPreviewType && !canPreview ? 'This file is too large for an in-app preview.' : 'This binary format cannot be displayed by the browser.'}</p>
             <div className="flex flex-wrap justify-center gap-2">
-              <button onClick={handleOpen} className="btn-primary inline-flex items-center gap-2"><HiExternalLink /> Open File</button>
+              {(previewInfo?.webViewLink || file.webViewLink) && <button onClick={handleOpen} className="btn-primary inline-flex items-center gap-2"><HiExternalLink /> Open in Google Drive</button>}
               <button onClick={handleDownload} className="btn-secondary inline-flex items-center gap-2"><HiDownload /> Download File</button>
             </div>
           </>
@@ -106,17 +106,7 @@ const FilePreviewModal = () => {
       return
     }
 
-    const popup = window.open('', '_blank')
-    try {
-      if (popup) popup.document.body.textContent = 'Opening file...'
-      const response = await downloadFile(file._id)
-      openFileResponse(response, popup, file.name)
-    } catch {
-      if (popup && !popup.closed) {
-        popup.document.body.textContent = 'File could not be opened. Return to AirDrive and upload the file again if it is a legacy upload.'
-      }
-      toast.error('File could not be opened. The request timed out or its stored content is unavailable.')
-    }
+    toast.error('No external viewer is available for this file. Use Download File instead.')
   }
 
   const handleDownload = async () => {
