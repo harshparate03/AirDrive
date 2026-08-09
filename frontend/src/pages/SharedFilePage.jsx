@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { HiDownload, HiLockClosed, HiFolder, HiExternalLink, HiCloudUpload, HiEye } from 'react-icons/hi'
-import api, { shareDownload, sharePreview } from '../services/api'
+import api, { shareDownload, sharePreview, sharePreviewInfo } from '../services/api'
 import { getFileIcon, formatFileSize } from '../utils/fileUtils'
+import { saveFileResponse } from '../utils/fileActions'
 import toast from 'react-hot-toast'
 
 const SharedFilePage = () => {
@@ -13,6 +14,8 @@ const SharedFilePage = () => {
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
+  const [previewInfo, setPreviewInfo] = useState(null)
+  const previewRef = useRef(null)
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['shared', token, password],
@@ -52,6 +55,18 @@ const SharedFilePage = () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }, [content?.file?._id, content?.file?.mimeType, token, password, error])
+
+  useEffect(() => {
+    if (!content?.file) return
+    setPreviewInfo(null)
+    sharePreviewInfo(token, password)
+      .then(response => setPreviewInfo(response.data.preview))
+      .catch(previewError => setPreviewInfo({
+        text: '',
+        available: previewError.response?.status !== 410,
+        error: previewError.response?.data?.error || 'Preview could not be prepared',
+      }))
+  }, [content?.file?._id, token, password])
 
   if (isExpired) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950">
@@ -170,12 +185,7 @@ const SharedFilePage = () => {
                 onClick={async () => {
                   try {
                     const res = await shareDownload(token, password)
-                    const url = URL.createObjectURL(new Blob([res.data]))
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = content.file.name
-                    a.click()
-                    URL.revokeObjectURL(url)
+                    saveFileResponse(res, content.file.name)
                   } catch (downloadError) {
                     toast.error(downloadError.response?.data?.error || 'Download failed')
                   }
@@ -191,7 +201,11 @@ const SharedFilePage = () => {
             {content?.file && (
               <button
                 type="button"
-                onClick={() => previewUrl ? window.open(previewUrl, '_blank', 'noopener,noreferrer') : toast.error('Preview is still loading')}
+                onClick={() => {
+                  if (previewUrl || previewInfo?.text) previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  else toast.error(previewInfo?.error || 'This file has no browser preview. Download it to open it.')
+                }}
+                disabled={previewInfo?.available === false}
                 className="btn-secondary flex items-center justify-center gap-2"
               >
                 <HiEye /> Preview File
@@ -200,8 +214,8 @@ const SharedFilePage = () => {
           </div>
 
           {/* Inline embedded preview */}
-          {content?.file && previewUrl && (['image/', 'video/', 'audio/'].some(p => content.file.mimeType.startsWith(p)) || content.file.mimeType === 'application/pdf') && (
-            <div className="mt-5">
+          {content?.file && (previewUrl || previewInfo?.text) && (
+            <div className="mt-5" ref={previewRef}>
               <p className="text-xs font-semibold text-dark-500 uppercase tracking-wider mb-2">Preview</p>
               {content.file.mimeType.startsWith('image/') && (
                 <img
@@ -223,7 +237,17 @@ const SharedFilePage = () => {
                   className="w-full h-80 rounded-xl border border-slate-100 dark:border-dark-700"
                 />
               )}
+              {!previewUrl && previewInfo?.text && (
+                <div className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-6 text-dark-700 dark:bg-dark-800 dark:text-dark-200">
+                  {previewInfo.text}
+                </div>
+              )}
             </div>
+          )}
+          {content?.file && previewInfo?.available === false && (
+            <p className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-300">
+              This shared file is no longer present in storage. Ask the owner to upload and share it again.
+            </p>
           )}
 
           {/* Folder contents */}

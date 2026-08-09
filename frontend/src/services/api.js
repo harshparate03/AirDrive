@@ -85,6 +85,11 @@ export const sharePreview = (token, password) => api.get(`/share/${token}/previe
   responseType: 'blob',
 })
 
+export const sharePreviewInfo = (token, password) => api.get(`/share/${token}/preview-info`, {
+  params: { password },
+  timeout: 30000,
+})
+
 // Download a shared file through the proxy (respects downloadDisabled)
 export const shareDownload = (token, password) => {
   return api.get(`/share/${token}/download`, {
