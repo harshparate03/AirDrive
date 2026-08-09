@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
 import { HiX, HiCheck, HiExclamation, HiUpload, HiChevronDown, HiChevronUp } from 'react-icons/hi'
@@ -16,8 +16,12 @@ const StatusIcon = ({ status }) => {
 
 const UploadPanel = () => {
   const dispatch = useDispatch()
-  const { queue } = useSelector(state => state.upload)
+  const { queue, isUploading } = useSelector(state => state.upload)
   const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    if (isUploading) setCollapsed(false)
+  }, [isUploading])
 
   if (!queue.length) return null
 
@@ -34,7 +38,7 @@ const UploadPanel = () => {
         initial={{ opacity: 0, y: 100 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 100 }}
-        className="fixed bottom-4 right-4 z-50 w-80 card shadow-glass-lg overflow-hidden"
+        className="fixed left-3 right-3 top-3 z-[80] sm:left-auto sm:right-5 sm:top-auto sm:bottom-5 sm:w-96 card shadow-2xl ring-1 ring-black/10 overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center gap-2 p-3 bg-dark-800 dark:bg-dark-900 text-white">
