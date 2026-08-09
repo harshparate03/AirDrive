@@ -103,6 +103,9 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=<email-user>
 EMAIL_PASS=<gmail-app-password>
+GMAIL_USER=<gmail-address>
+GMAIL_APP_PASSWORD=<gmail-app-password-without-spaces>
+GMAIL_FROM_NAME=AirDrive
 CLIENT_URL=https://air-drive-snowy.vercel.app
 ```
 

@@ -14,6 +14,7 @@ const { ensureFileText } = require('../services/textExtraction');
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
 const { getPublicClientUrl } = require('../utils/publicClientUrl');
+const { getEmailConfig } = require('../utils/sendEmail');
 
 // Helper to get a user's Google tokens
 const getTokens = (user) => ({
@@ -317,18 +318,20 @@ router.post('/email', authenticate, async (req, res) => {
     const permission = shareLink.permission;
     const safeName = String(fileName).replace(/[<>&"']/g, '');
     const nodemailer = require('nodemailer');
+    const { user: mailUser, pass: mailPass, fromName } = getEmailConfig();
+    if (!mailUser || !mailPass) return res.status(503).json({ error: 'Email service is not configured' });
     const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.EMAIL_PORT) || 587,
       secure: false,
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      auth: { user: mailUser, pass: mailPass },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000,
     });
 
     await transporter.sendMail({
-      from: `"Air Drive" <${process.env.EMAIL_USER}>`,
+      from: `"${fromName}" <${mailUser}>`,
       to: email,
       subject: `${req.user.name} shared "${safeName}" with you`,
       html: `
