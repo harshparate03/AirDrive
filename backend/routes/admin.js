@@ -39,15 +39,16 @@ router.post('/login', async (req, res) => {
 // POST /api/admin/bootstrap - One-time recovery when a deployment has no active admin.
 // The endpoint locks itself as soon as one active administrator exists and always
 // verifies the target account password before granting the role.
-router.post('/bootstrap', async (req, res) => {
+router.post('/bootstrap', authenticate, async (req, res) => {
   try {
     const activeAdmins = await User.countDocuments({ role: 'admin', isActive: true });
     if (activeAdmins > 0) return res.status(409).json({ error: 'Administrator bootstrap is already locked' });
 
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
-    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
-    if (!user || !await user.comparePassword(password)) return res.status(401).json({ error: 'Invalid credentials' });
+    const { email } = req.body;
+    if (!email || req.user.email !== email.toLowerCase().trim()) {
+      return res.status(403).json({ error: 'Authenticated account does not match the recovery target' });
+    }
+    const user = await User.findById(req.user._id);
 
     user.role = 'admin';
     user.isActive = true;
