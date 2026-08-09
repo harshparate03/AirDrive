@@ -31,6 +31,8 @@ const createReadStream = (filePath) => {
   return fs.createReadStream(filePath);
 };
 
+const fileExists = (filePath) => Boolean(filePath && fs.existsSync(filePath));
+
 // Delete a file from local disk
 const deleteFile = async (filePath) => {
   try {
@@ -64,6 +66,7 @@ module.exports = {
   saveBuffer,
   readFile,
   createReadStream,
+  fileExists,
   deleteFile,
   copyFile,
   getSize,

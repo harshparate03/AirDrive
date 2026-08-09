@@ -203,7 +203,7 @@ const getFileStream = async (accessToken, refreshToken, fileId) => {
   const drive = getDriveClient(accessToken, refreshToken);
   const response = await drive.files.get(
     { fileId, alt: 'media' },
-    { responseType: 'stream' }
+    { responseType: 'stream', timeout: 30000 }
   );
   return response.data;
 };
