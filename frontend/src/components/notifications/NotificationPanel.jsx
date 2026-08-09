@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { HiBell, HiCheck, HiX } from 'react-icons/hi'
 import { markRead, markAllRead, removeNotification } from '../../store/slices/notificationSlice'
 import api from '../../services/api'
+import { useNavigate } from 'react-router-dom'
 
 const ICONS = {
   upload: '📤', share: '🔗', storage_warning: '⚠️', login: '🔐',
@@ -12,6 +13,7 @@ const ICONS = {
 
 const NotificationPanel = ({ onClose }) => {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const { items, unreadCount } = useSelector(state => state.notifications)
 
   const handleMarkRead = (id) => {
@@ -27,6 +29,14 @@ const NotificationPanel = ({ onClose }) => {
   const handleDelete = (id) => {
     api.delete(`/notifications/${id}`).catch(() => {})
     dispatch(removeNotification(id))
+  }
+
+  const handleOpen = (notification) => {
+    if (!notification.read) handleMarkRead(notification._id)
+    if (notification.link) {
+      navigate(notification.link)
+      onClose?.()
+    }
   }
 
   return (
@@ -65,7 +75,7 @@ const NotificationPanel = ({ onClose }) => {
           items.slice(0, 20).map(notif => (
             <div
               key={notif._id}
-              onClick={() => !notif.read && handleMarkRead(notif._id)}
+              onClick={() => handleOpen(notif)}
               className={`flex items-start gap-3 p-3.5 border-b border-slate-50 dark:border-dark-800 last:border-0 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-dark-800 ${!notif.read ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''}`}
             >
               <span className="text-xl flex-shrink-0 mt-0.5">{ICONS[notif.type] || '🔔'}</span>

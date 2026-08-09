@@ -22,6 +22,14 @@ const AdminAnalytics = ({ dashboard }) => {
   const growth = dashboard?.userGrowth || []
   const storage = dashboard?.storageStats || []
   const ai = dashboard?.aiUsage || []
+  const interactions = dashboard?.activityBreakdown || []
+  const dailyInteractions = Object.values((dashboard?.activityTrends || []).reduce((days, item) => {
+    const date = item._id?.date
+    if (!date) return days
+    days[date] = days[date] || { date, count: 0 }
+    days[date].count += item.count
+    return days
+  }, {}))
 
   const growthData = {
     labels: growth.map(item => new Date(`${item._id}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
@@ -34,6 +42,14 @@ const AdminAnalytics = ({ dashboard }) => {
   const aiData = {
     labels: ai.map(item => item._id || 'Other'),
     datasets: [{ label: 'Requests', data: ai.map(item => item.count), backgroundColor: ai.map((_, index) => palette[index % palette.length]), borderRadius: 8, maxBarThickness: 42 }],
+  }
+  const interactionData = {
+    labels: interactions.slice(0, 10).map(item => (item._id || 'other').replaceAll('_', ' ')),
+    datasets: [{ label: 'Interactions', data: interactions.slice(0, 10).map(item => item.count), backgroundColor: interactions.slice(0, 10).map((_, index) => palette[index % palette.length]), borderRadius: 8, maxBarThickness: 38 }],
+  }
+  const dailyData = {
+    labels: dailyInteractions.map(item => new Date(`${item.date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
+    datasets: [{ label: 'User interactions', data: dailyInteractions.map(item => item.count), borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,.12)', fill: true, tension: 0.35, pointRadius: 2 }],
   }
 
   return (
@@ -49,6 +65,14 @@ const AdminAnalytics = ({ dashboard }) => {
       <section className="card p-5 xl:col-span-12">
         <div className="mb-4"><h3 className="font-semibold text-dark-800 dark:text-white">AI service usage</h3><p className="text-xs text-dark-400">Requests grouped by AI capability</p></div>
         <div className="h-64">{ai.length ? <Bar data={aiData} options={commonOptions} /> : <EmptyChart />}</div>
+      </section>
+      <section className="card p-5 xl:col-span-7">
+        <div className="mb-4"><h3 className="font-semibold text-dark-800 dark:text-white">Platform interaction trend</h3><p className="text-xs text-dark-400">Uploads, downloads, shares, views, AI actions, and account activity over 30 days</p></div>
+        <div className="h-64">{dailyInteractions.length ? <Line data={dailyData} options={commonOptions} /> : <EmptyChart />}</div>
+      </section>
+      <section className="card p-5 xl:col-span-5">
+        <div className="mb-4"><h3 className="font-semibold text-dark-800 dark:text-white">Top user actions</h3><p className="text-xs text-dark-400">Most frequent interactions across AirDrive</p></div>
+        <div className="h-64">{interactions.length ? <Bar data={interactionData} options={{ ...commonOptions, indexAxis: 'y' }} /> : <EmptyChart />}</div>
       </section>
     </div>
   )
