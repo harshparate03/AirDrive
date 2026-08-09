@@ -34,19 +34,26 @@ const sendTransactionalEmail = async ({ to, subject, html }) => {
   const brevo = getBrevoConfig();
   if (brevo.apiKey) {
     if (!brevo.fromEmail) throw new Error('Brevo sender is not configured. Set BREVO_FROM_EMAIL.');
-    await axios.post('https://api.brevo.com/v3/smtp/email', {
-      sender: { name: brevo.fromName, email: brevo.fromEmail },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
-    }, {
-      headers: {
-        accept: 'application/json',
-        'api-key': brevo.apiKey,
-        'content-type': 'application/json',
-      },
-      timeout: 15000,
-    });
+    try {
+      await axios.post('https://api.brevo.com/v3/smtp/email', {
+        sender: { name: brevo.fromName, email: brevo.fromEmail },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }, {
+        headers: {
+          accept: 'application/json',
+          'api-key': brevo.apiKey,
+          'content-type': 'application/json',
+        },
+        timeout: 15000,
+      });
+    } catch (error) {
+      const providerMessage = error.response?.data?.message || error.response?.data?.code || error.message;
+      const safeError = new Error(`Brevo email rejected: ${providerMessage}`);
+      safeError.status = error.response?.status;
+      throw safeError;
+    }
     return;
   }
 

@@ -194,8 +194,12 @@ router.post('/forgot-password', async (req, res) => {
     try {
       await sendOTPEmail(user.email, user.name, otp);
     } catch (err) {
-      console.error('OTP email send failed:', err);
-      return res.status(500).json({ error: 'Failed to send OTP email. Please try again.' });
+      console.error('OTP email send failed:', err.message, err.status || '');
+      const detail = err.message?.startsWith('Brevo email rejected:') ? err.message : null;
+      return res.status(500).json({
+        error: 'Failed to send OTP email. Please try again.',
+        ...(detail && { detail }),
+      });
     }
 
     res.json({ message: 'Password reset OTP sent to your email.' });
