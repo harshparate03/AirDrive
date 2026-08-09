@@ -4,7 +4,7 @@ const { authenticate } = require('../middleware/auth');
 const File = require('../models/File');
 const AIHistory = require('../models/AIHistory');
 const { decrypt } = require('../utils/encryption');
-const { logActivity: logActivityFn, getClientInfo: getClientInfoFn } = require('../utils/activityLogger');
+const { logActivity: logActivityFn, createNotification: createNotificationFn, getClientInfo: getClientInfoFn } = require('../utils/activityLogger');
 const driveService = require('../services/googleDrive');
 const { ensureFileText } = require('../services/textExtraction');
 const OpenAI = require('openai');
@@ -115,6 +115,11 @@ router.post('/summary', authenticate, async (req, res) => {
       duration: Date.now() - start,
     });
 
+    await createNotificationFn(req.app.get('io'), req.user._id, {
+      type: 'ai', title: 'Document Analysis Ready', message: `${type} completed for ${file.name}`,
+      data: { fileId: file._id, operation: type }, icon: 'sparkles', link: '/ai',
+    });
+
     res.json({ response, type, tokens });
   } catch (error) {
     res.status(500).json({ error: 'AI summary failed' });
@@ -173,6 +178,12 @@ let tags = [];
       duration: Date.now() - start,
     });
 
+    await logActivityFn({ userId: req.user._id, action: 'ai_tag', fileId: file._id, details: `Generated ${tags.length} AI tags`, ...getClientInfoFn(req) });
+    await createNotificationFn(req.app.get('io'), req.user._id, {
+      type: 'ai', title: 'AI Tags Ready', message: `${tags.length} tags generated for ${file.name}`,
+      data: { fileId: file._id, tags }, icon: 'sparkles', link: '/my-drive',
+    });
+
     res.json({ tags, file });
   } catch (error) {
     res.status(500).json({ error: 'AI tagging failed' });
@@ -227,6 +238,11 @@ router.post('/rename', authenticate, async (req, res) => {
       prompt: file.name,
       response: suggestedName,
       duration: Date.now() - start,
+    });
+
+    await createNotificationFn(req.app.get('io'), req.user._id, {
+      type: 'ai', title: 'Smart Rename Ready', message: `A new filename was suggested for ${file.name}`,
+      data: { fileId: file._id, suggestedName }, icon: 'sparkles', link: '/ai',
     });
 
     res.json({ suggestedName, reason, originalName: file.name });

@@ -42,7 +42,7 @@ router.get('/dashboard', async (req, res) => {
     const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
     const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
-    const [totalUsers, activeUsers, totalFiles, recentActivities, aiUsage, recentLogins, recentSignups] = await Promise.all([
+    const [totalUsers, activeUsers, totalFiles, recentActivities, aiUsage, recentLogins, recentSignups, activityTrends, activityBreakdown] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ lastLoginAt: { $gte: dayAgo } }),
       File.countDocuments({ trashed: false }),
@@ -59,6 +59,16 @@ router.get('/dashboard', async (req, res) => {
         .sort({ createdAt: -1 })
         .limit(15)
         .lean(),
+      Activity.aggregate([
+        { $match: { createdAt: { $gte: monthAgo } } },
+        { $group: { _id: { date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, action: '$action' }, count: { $sum: 1 } } },
+        { $sort: { '_id.date': 1 } },
+      ]),
+      Activity.aggregate([
+        { $match: { createdAt: { $gte: monthAgo } } },
+        { $group: { _id: '$action', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
     ]);
 
     // Storage analytics
@@ -74,7 +84,7 @@ router.get('/dashboard', async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
-    res.json({ totalUsers, activeUsers, totalFiles, recentActivities, aiUsage, storageStats, userGrowth, recentLogins, recentSignups });
+    res.json({ totalUsers, activeUsers, totalFiles, recentActivities, aiUsage, storageStats, userGrowth, recentLogins, recentSignups, activityTrends, activityBreakdown });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch admin dashboard' });
   }
@@ -92,13 +102,14 @@ router.get('/notifications', async (req, res) => {
         .populate('userId', 'name email').lean(),
       User.find({ createdAt: { $gte: recent } })
         .select('name email createdAt lastLoginAt').sort({ createdAt: -1 }).limit(30).lean(),
-      Activity.find({ action: { $in: ['delete', 'delete_folder', 'download'] }, createdAt: { $gte: recent } })
-        .sort({ createdAt: -1 }).limit(30)
+      Activity.find({ action: { $ne: 'login' }, createdAt: { $gte: recent } })
+        .sort({ createdAt: -1 }).limit(50)
         .populate('userId', 'name email').lean(),
     ]);
 
     const items = [
       ...logins.map(a => ({
+        _id: `login-${a._id}`,
         type: 'login',
         title: 'User Login',
         message: `${a.userId?.name || 'Unknown'} (${a.userId?.email || '?'}) logged in`,
@@ -107,6 +118,7 @@ router.get('/notifications', async (req, res) => {
         ip: a.ip,
       })),
       ...signups.map(u => ({
+        _id: `signup-${u._id}`,
         type: 'signup',
         title: 'New User Registered',
         message: `${u.name} (${u.email}) joined`,
@@ -114,9 +126,10 @@ router.get('/notifications', async (req, res) => {
         createdAt: u.createdAt,
       })),
       ...activity.map(a => ({
+        _id: `activity-${a._id}`,
         type: 'activity',
-        title: `User ${a.action}`,
-        message: `${a.userId?.name || 'Unknown'} performed ${a.action}`,
+        title: a.action.split('_').map(word => word[0]?.toUpperCase() + word.slice(1)).join(' '),
+        message: `${a.userId?.name || 'Unknown'} (${a.userId?.email || '?'}) performed ${a.action.replaceAll('_', ' ')}`,
         email: a.userId?.email || '',
         createdAt: a.createdAt,
       })),

@@ -320,6 +320,7 @@ const AdminNotifications = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-notifications'],
     queryFn: () => api.get('/admin/notifications').then(r => r.data),
+    refetchInterval: 15000,
   })
 
   const notifications = data?.notifications || []
