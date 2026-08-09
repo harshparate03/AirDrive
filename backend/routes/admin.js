@@ -402,7 +402,7 @@ router.get('/health', async (req, res) => {
       { name: 'API', status: 'operational', detail: 'Express API responding' },
       { name: 'Database', status: databaseConnected ? 'operational' : 'degraded', detail: databaseConnected ? 'MongoDB connected' : 'MongoDB disconnected' },
       { name: 'Authentication', status: process.env.JWT_SECRET ? 'operational' : 'degraded', detail: process.env.JWT_SECRET ? 'JWT configured' : 'JWT configuration missing' },
-      { name: 'Email', status: process.env.EMAIL_USER && process.env.EMAIL_PASS ? 'operational' : 'not_configured', detail: 'SMTP configuration' },
+      { name: 'Email', status: (process.env.GMAIL_USER || process.env.EMAIL_USER) && (process.env.GMAIL_APP_PASSWORD || process.env.EMAIL_PASS) ? 'operational' : 'not_configured', detail: 'SMTP configuration' },
       { name: 'AI', status: process.env.OPENAI_API_KEY ? 'operational' : 'not_configured', detail: 'AI provider configuration' },
       { name: 'Storage', status: 'operational', detail: 'Local and connected Drive storage supported' },
     ],

@@ -1,14 +1,21 @@
 const nodemailer = require('nodemailer');
 
+const getEmailConfig = () => ({
+  user: process.env.GMAIL_USER || process.env.EMAIL_USER || '',
+  pass: (process.env.GMAIL_APP_PASSWORD || process.env.EMAIL_PASS || '').replace(/\s+/g, ''),
+  fromName: process.env.GMAIL_FROM_NAME || 'AirDrive',
+});
+
 const createTransporter = () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error('Email is not configured. Set EMAIL_USER and EMAIL_PASS.');
+  const { user, pass } = getEmailConfig();
+  if (!user || !pass) {
+    throw new Error('Email is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD.');
   }
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.EMAIL_PORT) || 587,
     secure: false,
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    auth: { user, pass },
     tls: { rejectUnauthorized: false },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
@@ -18,8 +25,9 @@ const createTransporter = () => {
 
 const sendOTPEmail = async (to, name, otp) => {
   const transporter = createTransporter();
+  const { user, fromName } = getEmailConfig();
   await transporter.sendMail({
-    from: `"AirDrive" <${process.env.EMAIL_USER}>`,
+    from: `"${fromName}" <${user}>`,
     to,
     subject: `${otp} - Your AirDrive password reset code`,
     html: `
@@ -47,8 +55,9 @@ const sendOTPEmail = async (to, name, otp) => {
 
 const sendWelcomeEmail = async (to, name) => {
   const transporter = createTransporter();
+  const { user, fromName } = getEmailConfig();
   await transporter.sendMail({
-    from: `"AirDrive" <${process.env.EMAIL_USER}>`,
+    from: `"${fromName}" <${user}>`,
     to,
     subject: `Welcome to AirDrive, ${name}!`,
     html: `<div style="font-family:'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;"><div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px 40px;text-align:center;"><h1 style="color:#fff;margin:0;font-size:24px;">Welcome to AirDrive!</h1></div><div style="padding:36px 40px;"><p style="color:#475569;font-size:15px;line-height:1.7;">Hi <strong>${name}</strong>,<br><br>Your account is ready. Upload files, organize folders, share securely, and use AI features.</p><a href="${process.env.CLIENT_URL}" style="display:inline-block;margin-top:16px;padding:12px 28px;background:#6366f1;color:#fff;text-decoration:none;border-radius:10px;font-weight:600;">Open AirDrive</a></div></div>`,
@@ -57,12 +66,13 @@ const sendWelcomeEmail = async (to, name) => {
 
 const sendPasswordChangedEmail = async (to, name) => {
   const transporter = createTransporter();
+  const { user, fromName } = getEmailConfig();
   await transporter.sendMail({
-    from: `"AirDrive" <${process.env.EMAIL_USER}>`,
+    from: `"${fromName}" <${user}>`,
     to,
     subject: 'Your AirDrive password was changed',
     html: `<div style="font-family:'Segoe UI',sans-serif;max-width:520px;margin:0 auto;padding:40px;background:#fff;border-radius:16px;"><h2 style="color:#0f172a;">Password changed</h2><p style="color:#475569;">Hi <strong>${name}</strong>, your AirDrive password was successfully changed.</p><p style="color:#475569;">If you did not make this change, contact support immediately.</p></div>`,
   });
 };
 
-module.exports = { sendOTPEmail, sendWelcomeEmail, sendPasswordChangedEmail };
+module.exports = { sendOTPEmail, sendWelcomeEmail, sendPasswordChangedEmail, getEmailConfig, createTransporter };
