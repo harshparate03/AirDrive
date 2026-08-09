@@ -131,10 +131,13 @@ return (
           <Route path="ai" element={<AIAssistantPage />} />
           <Route path="storage" element={<StoragePage />} />
           <Route path="settings" element={<SettingsPage />} />
-          <Route path="admin" element={<AdminPage />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="requests" element={<FileRequestPage />} />
         </Route>
+
+        <Route path="/admin" element={
+          <PrivateRoute><AdminPage /></PrivateRoute>
+        } />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
