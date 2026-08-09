@@ -106,6 +106,9 @@ EMAIL_PASS=<gmail-app-password>
 GMAIL_USER=<gmail-address>
 GMAIL_APP_PASSWORD=<gmail-app-password-without-spaces>
 GMAIL_FROM_NAME=AirDrive
+BREVO_API_KEY=<brevo-api-key>
+BREVO_FROM_EMAIL=<verified-brevo-sender>
+BREVO_FROM_NAME=AirDrive
 CLIENT_URL=https://air-drive-snowy.vercel.app
 ```
 
