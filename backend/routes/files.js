@@ -194,7 +194,7 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
 
       uploadedFiles.push(fileMeta);
 
-      if (/^(text\/|application\/pdf)|wordprocessingml/.test(fileMeta.mimeType)) {
+      if (/^(text\/|application\/pdf)|wordprocessingml/.test(fileMeta.mimeType) || ['.xlsx', '.pptx', '.odt', '.ods', '.odp', '.zip'].includes(ext)) {
         setImmediate(async () => {
           try {
             const freshFile = await File.findById(fileMeta._id);
@@ -584,7 +584,8 @@ router.get('/:id/preview-info', authenticate, async (req, res) => {
     const mimeType = file.mimeType || '';
     const extension = (file.extension || '').toLowerCase();
     const textCapable = mimeType.startsWith('text/') || mimeType === 'application/pdf' ||
-      mimeType.includes('wordprocessingml') || ['.txt', '.md', '.csv', '.json', '.xml', '.docx'].includes(extension);
+      mimeType.includes('wordprocessingml') ||
+      ['.txt', '.md', '.csv', '.json', '.xml', '.docx', '.xlsx', '.pptx', '.odt', '.ods', '.odp', '.zip'].includes(extension);
     if (!text && textCapable && file.textExtractionStatus !== 'unsupported') {
       text = await ensureFileText(file, req.user).catch(() => '');
     }
