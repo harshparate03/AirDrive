@@ -9,6 +9,8 @@ const { logActivity, createNotification, getClientInfo } = require('../utils/act
 const { hashPassword } = require('../utils/encryption');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
+const localService = require('../services/localStorage');
+const { ensureFileText } = require('../services/textExtraction');
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
 
@@ -170,6 +172,36 @@ const resolveShare = async (token, password, user) => {
   return { shareLink };
 };
 
+// GET /api/share/:token/preview-info - Extracted content for shared documents
+router.get('/:token/preview-info', optionalAuth, async (req, res) => {
+  try {
+    const { shareLink, error } = await resolveShare(req.params.token, req.query.password, req.user);
+    if (error) return res.status(error.status).json({ error: error.message });
+    if (!shareLink.fileId) return res.status(400).json({ error: 'Preview only available for files' });
+
+    const [file, owner] = await Promise.all([
+      File.findOne({ _id: shareLink.fileId, userId: shareLink.userId, trashed: false }),
+      User.findById(shareLink.userId),
+    ]);
+    if (!file || !owner) return res.status(404).json({ error: 'File not found' });
+
+    const available = file.storageType === 'google'
+      ? Boolean(file.googleFileId)
+      : localService.fileExists(file.localPath);
+    if (!available) return res.status(410).json({ error: 'File content is no longer available', code: 'FILE_CONTENT_MISSING' });
+
+    const extension = (file.extension || '').toLowerCase();
+    const extractable = (file.mimeType || '').startsWith('text/') || file.mimeType === 'application/pdf' ||
+      ['.txt', '.md', '.csv', '.json', '.xml', '.docx', '.xlsx', '.pptx', '.odt', '.ods', '.odp', '.zip'].includes(extension);
+    const text = extractable ? await ensureFileText(file, owner).catch(() => '') : '';
+
+    res.json({ preview: { text: text.slice(0, 50000), available: true, extractable } });
+  } catch (error) {
+    console.error('Shared preview info error:', error);
+    res.status(500).json({ error: 'Failed to prepare shared file preview' });
+  }
+});
+
 // GET /api/share/:token/preview - Inline preview of a shared file
 router.get('/:token/preview', optionalAuth, async (req, res) => {
   try {
@@ -180,6 +212,9 @@ router.get('/:token/preview', optionalAuth, async (req, res) => {
 
     const file = await File.findOne({ _id: shareLink.fileId, userId: shareLink.userId, trashed: false });
     if (!file) return res.status(404).json({ error: 'File not found' });
+    if (file.storageType !== 'google' && !localService.fileExists(file.localPath)) {
+      return res.status(410).json({ error: 'File content is no longer available', code: 'FILE_CONTENT_MISSING' });
+    }
 
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
@@ -190,7 +225,6 @@ router.get('/:token/preview', optionalAuth, async (req, res) => {
       const stream = await driveService.getFileStream(accessToken, refreshToken, file.googleFileId);
       stream.pipe(res);
     } else {
-      const localService = require('../services/localStorage');
       const stream = localService.createReadStream(file.localPath);
       stream.pipe(res);
     }
@@ -211,6 +245,9 @@ router.get('/:token/download', optionalAuth, async (req, res) => {
 
     const file = await File.findOne({ _id: shareLink.fileId, userId: shareLink.userId, trashed: false });
     if (!file) return res.status(404).json({ error: 'File not found' });
+    if (file.storageType !== 'google' && !localService.fileExists(file.localPath)) {
+      return res.status(410).json({ error: 'File content is no longer available', code: 'FILE_CONTENT_MISSING' });
+    }
 
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.name)}"`);
@@ -220,7 +257,6 @@ router.get('/:token/download', optionalAuth, async (req, res) => {
       const stream = await driveService.getFileStream(accessToken, refreshToken, file.googleFileId);
       stream.pipe(res);
     } else {
-      const localService = require('../services/localStorage');
       const stream = localService.createReadStream(file.localPath);
       stream.pipe(res);
     }
