@@ -36,6 +36,29 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// POST /api/admin/bootstrap - One-time recovery when a deployment has no active admin.
+// The endpoint locks itself as soon as one active administrator exists and always
+// verifies the target account password before granting the role.
+router.post('/bootstrap', async (req, res) => {
+  try {
+    const activeAdmins = await User.countDocuments({ role: 'admin', isActive: true });
+    if (activeAdmins > 0) return res.status(409).json({ error: 'Administrator bootstrap is already locked' });
+
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
+    if (!user || !await user.comparePassword(password)) return res.status(401).json({ error: 'Invalid credentials' });
+
+    user.role = 'admin';
+    user.isActive = true;
+    user.refreshToken = '';
+    await user.save();
+    res.json({ message: 'Administrator access restored. Sign in again.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Administrator bootstrap failed' });
+  }
+});
+
 // All admin routes require auth + admin role
 router.use(authenticate, requireAdmin);
 
@@ -239,6 +262,10 @@ router.patch('/users/:id', async (req, res) => {
     if (role && !['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
     if (user._id.equals(req.user._id) && (role === 'user' || isActive === false)) {
       return res.status(400).json({ error: 'You cannot remove your own admin access' });
+    }
+    if (user.role === 'admin' && (role === 'user' || isActive === false)) {
+      const activeAdmins = await User.countDocuments({ role: 'admin', isActive: true });
+      if (activeAdmins <= 1) return res.status(400).json({ error: 'The last active administrator cannot be removed' });
     }
 
     if (role) user.role = role;
