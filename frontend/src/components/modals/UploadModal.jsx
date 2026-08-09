@@ -8,12 +8,14 @@ import useUpload from '../../hooks/useUpload'
 const UploadModal = () => {
   const dispatch = useDispatch()
   const { modalData } = useSelector(s => s.ui)
+  const uploadQueue = useSelector(s => s.upload.queue)
   const folderId = modalData?.folderId || null
   const { upload } = useUpload(folderId)
   const [dragOver, setDragOver] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [done, setDone] = useState(false)
+  const [batchStartIndex, setBatchStartIndex] = useState(null)
   const fileRef = useRef(null)
   const folderRef = useRef(null)
 
@@ -33,6 +35,7 @@ const UploadModal = () => {
 
   const handleUpload = async () => {
     if (!selectedFiles.length) return
+    setBatchStartIndex(uploadQueue.length)
     setUploading(true)
     await upload(selectedFiles)
     setUploading(false)
@@ -47,6 +50,12 @@ const UploadModal = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
   }
+
+  const batchItems = batchStartIndex === null ? [] : uploadQueue.slice(batchStartIndex, batchStartIndex + selectedFiles.length)
+  const batchTotalBytes = batchItems.reduce((sum, item) => sum + (item.size || 0), 0)
+  const batchUploadedBytes = batchItems.reduce((sum, item) => sum + ((item.size || 0) * (item.progress || 0) / 100), 0)
+  const batchProgress = batchTotalBytes ? Math.round((batchUploadedBytes / batchTotalBytes) * 100) : 0
+  const completedFiles = batchItems.filter(item => item.status === 'completed').length
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -151,6 +160,30 @@ const UploadModal = () => {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {(uploading || done) && (
+            <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4 dark:border-primary-800 dark:bg-primary-900/20" role="status" aria-live="polite">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-dark-800 dark:text-dark-100">
+                    {done ? 'Upload complete' : `Uploading file ${Math.min(completedFiles + 1, selectedFiles.length)} of ${selectedFiles.length}`}
+                  </p>
+                  <p className="text-xs text-dark-500 dark:text-dark-300">
+                    {formatSize(batchUploadedBytes)} uploaded · {formatSize(Math.max(0, batchTotalBytes - batchUploadedBytes))} remaining
+                  </p>
+                </div>
+                <span className="text-xl font-bold text-primary-600 dark:text-primary-400">{batchProgress}%</span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-white dark:bg-dark-700">
+                <motion.div
+                  className="h-full rounded-full bg-primary-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${batchProgress}%` }}
+                  transition={{ duration: 0.2 }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
