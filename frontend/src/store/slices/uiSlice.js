@@ -10,7 +10,7 @@ const uiSlice = createSlice({
   name: 'ui',
   initialState: {
     theme: getInitialTheme(),
-    sidebarOpen: true,
+    sidebarOpen: false,
     sidebarCollapsed: false,
     viewMode: localStorage.getItem('viewMode') || 'grid', // grid | list
     previewFile: null,
@@ -49,6 +49,9 @@ const uiSlice = createSlice({
     },
     toggleSidebar(state) {
       state.sidebarOpen = !state.sidebarOpen
+    },
+    closeSidebar(state) {
+      state.sidebarOpen = false
     },
     toggleSidebarCollapse(state) {
       state.sidebarCollapsed = !state.sidebarCollapsed
@@ -98,7 +101,7 @@ const uiSlice = createSlice({
 })
 
 export const {
-  toggleTheme, setTheme, toggleSidebar, toggleSidebarCollapse, setViewMode,
+  toggleTheme, setTheme, toggleSidebar, closeSidebar, toggleSidebarCollapse, setViewMode,
   setPreviewFile, setSelectedFiles, toggleFileSelection, clearSelection,
   setSearchQuery, setContextMenu, openModal, closeModal,
   setCurrentFolder, setBreadcrumb,

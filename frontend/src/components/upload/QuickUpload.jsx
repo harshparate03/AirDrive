@@ -27,10 +27,11 @@ const QuickUpload = ({ folderId = null }) => {
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => inputRef.current?.click()}
-        className="btn-primary flex items-center gap-2"
+        className="touch-target flex items-center justify-center gap-1.5 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 hover:shadow-neon active:scale-95 sm:px-4"
+        aria-label="Quick upload files"
       >
         <HiUpload className="text-lg" />
-        Quick Upload
+        <span className="hidden sm:inline">Quick Upload</span>
       </motion.button>
     </>
   )
