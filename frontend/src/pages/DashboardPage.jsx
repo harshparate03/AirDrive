@@ -105,7 +105,6 @@ const DashboardPage = () => {
           </p>
         </div>
         <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3">
-          <ViewModeToggle />
           <QuickUpload />
         </div>
       </div>
@@ -115,6 +114,7 @@ const DashboardPage = () => {
         {statCards.map((card, i) => (
           <motion.div
             key={card.label}
+            className="h-full"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
@@ -143,9 +143,12 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Recent files */}
 <div className="card p-5 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-dark-700 dark:text-dark-200">Recent Files</h2>
-            <HiClock className="text-dark-400" />
+            <div className="flex items-center gap-2">
+              <HiClock className="text-dark-400" />
+              <ViewModeToggle />
+            </div>
           </div>
           {viewMode === 'grid'
             ? <FileGrid files={recentFilesData?.files || []} />
