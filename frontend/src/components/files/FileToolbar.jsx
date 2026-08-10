@@ -105,18 +105,18 @@ const FileToolbar = ({ onRefresh }) => {
   ]
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-700/50 animate-fade-in">
+    <div className="flex items-center gap-2 overflow-x-auto px-3 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-700/50 animate-fade-in sm:px-4">
       <span className="text-sm font-semibold text-primary-700 dark:text-primary-300 mr-1">
         {count} selected
       </span>
       <div className="w-px h-4 bg-primary-200 dark:bg-primary-700/50" />
-      <div className="flex items-center gap-0.5 flex-1 flex-wrap">
+      <div className="flex min-w-max items-center gap-0.5 flex-1 sm:flex-wrap">
         {actions.map(action => (
           <button
             key={action.label}
             onClick={action.onClick}
             disabled={action.loading}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-primary-100 dark:hover:bg-primary-800/30 disabled:opacity-50 ${action.className || 'text-dark-600 dark:text-dark-300'}`}
+            className={`touch-target flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-primary-100 dark:hover:bg-primary-800/30 disabled:opacity-50 ${action.className || 'text-dark-600 dark:text-dark-300'}`}
             title={action.label}
           >
             {action.loading

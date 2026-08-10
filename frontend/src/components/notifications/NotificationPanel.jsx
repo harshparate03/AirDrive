@@ -1,7 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { useDispatch, useSelector } from 'react-redux'
-import { HiBell, HiCheck, HiX } from 'react-icons/hi'
+import { HiBell, HiX } from 'react-icons/hi'
 import { markRead, markAllRead, removeNotification } from '../../store/slices/notificationSlice'
 import api from '../../services/api'
 import { useNavigate } from 'react-router-dom'
@@ -44,7 +44,7 @@ const NotificationPanel = ({ onClose }) => {
       initial={{ opacity: 0, y: -10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      className="absolute right-0 top-12 w-80 card shadow-glass-lg z-50 overflow-hidden"
+      className="fixed inset-x-3 top-[4.25rem] z-50 max-h-[calc(100dvh-5.25rem)] overflow-hidden card shadow-glass-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-80 sm:max-h-none"
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-dark-700">

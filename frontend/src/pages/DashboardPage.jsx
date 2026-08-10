@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import {
-  HiFolder, HiDocument, HiUpload, HiDownload,
+  HiFolder, HiDocument,
   HiShare, HiStar, HiTrendingUp, HiClock,
 } from 'react-icons/hi'
 import api from '../services/api'
@@ -101,7 +101,7 @@ const DashboardPage = () => {
             {greeting()}, {user?.name?.split(' ')[0]} 👋
           </h1>
           <p className="text-dark-500 dark:text-dark-400 mt-0.5 text-sm">
-            Here's what's happening with your files today.
+            Here&apos;s what&apos;s happening with your files today.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -111,7 +111,7 @@ const DashboardPage = () => {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         {statCards.map((card, i) => (
           <motion.div
             key={card.label}
