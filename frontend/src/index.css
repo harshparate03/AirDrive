@@ -143,10 +143,59 @@
   pointer-events: none;
 }
 
+.otp-secure-cell {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 56px;
+  perspective: 700px;
+  transform-style: preserve-3d;
+}
+
+.otp-secure-cell__front,
+.otp-secure-cell__seal {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.otp-secure-cell__seal {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border: 1.5px solid rgba(165, 243, 252, .85);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(34, 211, 238, .25), rgba(99, 102, 241, .38));
+  color: #cffafe;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .48), 0 0 26px rgba(34, 211, 238, .34), 0 14px 30px rgba(15, 23, 42, .3);
+  transform: rotateY(180deg);
+  backdrop-filter: blur(18px) saturate(160%);
+}
+
+.otp-secure-cell__seal svg { font-size: 18px; filter: drop-shadow(0 0 7px rgba(207, 250, 254, .7)); }
+.otp-secure-cell__seal b { font-size: 7px; letter-spacing: .1em; opacity: .68; }
+
+.otp-orbit-row.is-checking .otp-secure-cell {
+  animation: otp-encryption-flip 1.18s cubic-bezier(.45, 0, .2, 1) both;
+  animation-delay: calc(var(--otp-index) * 85ms);
+}
+
 .otp-orbit-row.is-checking input {
   border-color: rgba(165, 243, 252, .95);
   background: linear-gradient(145deg, rgba(255, 255, 255, .34), rgba(99, 102, 241, .23));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 12px 30px rgba(15, 23, 42, .24), 0 0 24px rgba(103, 232, 249, .32);
+}
+
+@keyframes otp-encryption-flip {
+  0% { transform: translateY(0) rotateY(0) scale(1); filter: brightness(1); }
+  18% { transform: translateY(-10px) rotateY(0) scale(1.06); filter: brightness(1.32); }
+  43%, 66% { transform: translateY(-7px) rotateY(180deg) scale(1.08); filter: brightness(1.22); }
+  88% { transform: translateY(-3px) rotateY(360deg) scale(1.03); filter: brightness(1.16); }
+  100% { transform: translateY(0) rotateY(360deg) scale(1); filter: brightness(1); }
 }
 
 .otp-verification-status {
@@ -193,7 +242,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .otp-orbit-row.is-checking .otp-secure-cell { animation: none; }
   .otp-verification-status i { animation: none; opacity: .8; }
+}
+
+@media (min-width: 640px) {
+  .otp-secure-cell { width: 48px; height: 64px; }
 }
 
 /* Progress bar */
