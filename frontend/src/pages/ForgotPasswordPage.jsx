@@ -91,7 +91,7 @@ const ForgotPasswordPage = () => {
       }
       frames.push({ transform: 'translate(0, 0) scale(1)', offset: 1 })
       return cell.animate(frames, {
-        duration: 2650,
+        duration: 4000,
         easing: 'cubic-bezier(.4, 0, .2, 1)',
       }).finished
     }))
