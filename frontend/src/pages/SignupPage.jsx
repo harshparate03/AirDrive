@@ -2,7 +2,8 @@ import React, { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { HiCloudUpload, HiUser, HiMail, HiLockClosed, HiEye, HiEyeOff } from 'react-icons/hi'
+import { HiUser, HiMail, HiLockClosed, HiEye, HiEyeOff } from 'react-icons/hi'
+import BrandLogo from '../components/ui/BrandLogo'
 import { register } from '../store/slices/authSlice'
 import toast from 'react-hot-toast'
 
@@ -53,9 +54,9 @@ const SignupPage = () => {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', delay: 0.1 }}
-          className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-purple-600 shadow-neon mb-4"
+          className="mb-4 inline-flex"
         >
-          <HiCloudUpload className="text-3xl text-white" />
+          <BrandLogo className="h-16 w-16" iconClassName="text-3xl" />
         </motion.div>
         <h1 className="text-3xl font-bold text-dark-900 dark:text-white">Create Account</h1>
         <p className="text-dark-500 dark:text-dark-300 mt-1">Start using Air Drive today</p>

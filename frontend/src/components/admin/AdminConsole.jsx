@@ -30,6 +30,7 @@ import {
 } from "react-icons/hi";
 import api from "../../services/api";
 import { logoutUser } from "../../store/slices/authSlice";
+import BrandLogo from "../ui/BrandLogo";
 import { toggleTheme } from "../../store/slices/uiSlice";
 import { formatFileSize } from "../../utils/fileUtils";
 import AdminAnalytics from "./AdminAnalytics";
@@ -101,9 +102,7 @@ const Console = () => {
   const Nav = () => (
     <div className="flex h-full flex-col">
       <div className="flex h-20 items-center gap-3 border-b border-white/10 px-5">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-violet-600 text-white">
-          <HiShieldCheck className="text-2xl" />
-        </div>
+        <BrandLogo className="h-11 w-11" iconClassName="text-2xl" />
         <div>
           <p className="font-bold text-white">AirDrive Control</p>
           <p className="text-[10px] uppercase tracking-[.22em] text-cyan-300/70">

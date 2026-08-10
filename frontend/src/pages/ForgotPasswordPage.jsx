@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { HiArrowLeft, HiCheck, HiCloudUpload, HiEye, HiEyeOff, HiLockClosed, HiMail, HiRefresh, HiShieldCheck, HiX } from 'react-icons/hi'
+import { HiArrowLeft, HiCheck, HiEye, HiEyeOff, HiLockClosed, HiMail, HiRefresh, HiShieldCheck, HiX } from 'react-icons/hi'
+import BrandLogo from '../components/ui/BrandLogo'
 import { forgotPassword, resetPassword, verifyOtp } from '../store/slices/authSlice'
 import toast from 'react-hot-toast'
 
@@ -133,7 +134,7 @@ const ForgotPasswordPage = () => {
     <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-[28px] border border-white/25 bg-white/10 p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,.32)] backdrop-blur-2xl sm:p-9">
       <div className="pointer-events-none absolute -left-20 -top-24 h-48 w-48 rounded-full bg-white/10" />
       <header className="relative text-center">
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-white/30 bg-gradient-to-br from-white/25 to-indigo-400/20 shadow-xl"><HiCloudUpload className="text-3xl" /></div>
+        <BrandLogo className="mx-auto mb-4 h-14 w-14 border border-white/30" iconClassName="text-3xl" />
         <p className="text-[10px] font-black uppercase tracking-[.2em] text-indigo-200">Secure account recovery</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight">{step === 1 ? 'Forgot password?' : step === 2 ? 'OTP Verification' : 'Create new password'}</h1>
         <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-300">{step === 1 ? 'Enter your AirDrive email and we will send a secure verification code.' : step === 2 ? `Enter the 6-digit code sent to ${maskedEmail}.` : 'Choose a strong password you have not used before.'}</p>

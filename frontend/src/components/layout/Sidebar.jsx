@@ -14,6 +14,7 @@ import StorageBar from '../ui/StorageBar'
 import { useQuery } from '@tanstack/react-query'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
+import BrandLogo from '../ui/BrandLogo'
 
 const navItems = [
   { to: '/dashboard', icon: HiHome, label: 'Home' },
@@ -57,9 +58,7 @@ const Sidebar = ({ mobile = false, onNavigate }) => {
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-100 dark:border-dark-800">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-            <HiCloudUpload className="text-white text-lg" />
-          </div>
+          <BrandLogo className="h-9 w-9" iconClassName="text-xl" />
           {!sidebarCollapsed && (
             <motion.span
               initial={{ opacity: 0 }}
