@@ -114,59 +114,33 @@
 .dark .admin-shell { background: radial-gradient(circle at 18% 5%,rgba(6,182,212,.10),transparent 28%), radial-gradient(circle at 82% 0%,rgba(99,102,241,.14),transparent 34%), #050914; }
 .admin-hero { background: linear-gradient(125deg,rgba(6,182,212,.94),rgba(79,70,229,.95) 48%,rgba(124,58,237,.95)); box-shadow: 0 24px 70px rgba(49,46,129,.22); }
 
-/* Clockwise OTP verification indicator */
-.otp-clock {
+/* Anti-clockwise OTP box orbit, adapted from the verification reference. */
+.otp-orbit-stage::before {
   position: absolute;
-  display: grid;
-  width: 78px;
-  height: 78px;
-  place-items: center;
-  border-radius: 9999px;
-  filter: drop-shadow(0 0 18px rgba(129, 140, 248, .42));
-}
-
-.otp-clock::before {
-  position: absolute;
-  inset: 0;
+  width: 176px;
+  height: 176px;
   content: '';
-  border-radius: inherit;
-  background: conic-gradient(from 0deg, transparent 0 16%, #67e8f9 38%, #818cf8 68%, #c084fc 92%, transparent 100%);
-  animation: otp-clockwise 1.05s linear infinite;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0);
-  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0);
-}
-
-.otp-clock__core {
-  display: grid;
-  width: 62px;
-  height: 62px;
-  place-items: center;
-  align-content: center;
-  gap: 2px;
-  border: 1px solid rgba(255, 255, 255, .22);
   border-radius: 9999px;
-  background: rgba(30, 41, 89, .88);
-  color: #c7d2fe;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
-  font-size: 22px;
-  backdrop-filter: blur(14px);
+  border: 1.5px dashed rgba(199, 210, 254, .42);
+  box-shadow: 0 0 30px rgba(129, 140, 248, .14);
+  opacity: 0;
+  transform: scale(.72);
+  transition: opacity .2s ease, transform .3s ease;
 }
 
-.otp-clock__core small {
-  color: #dbeafe;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: .12em;
-  line-height: 1;
-  text-transform: uppercase;
+.otp-orbit-stage.is-checking::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
-@keyframes otp-clockwise {
-  to { transform: rotate(360deg); }
+.otp-orbit-row.is-checking {
+  pointer-events: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .otp-clock::before { animation-duration: 2.8s; }
+.otp-orbit-row.is-checking input {
+  border-color: rgba(165, 180, 252, .9);
+  background: rgba(129, 140, 248, .18);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .2), 0 0 18px rgba(129, 140, 248, .28);
 }
 
 /* Progress bar */
