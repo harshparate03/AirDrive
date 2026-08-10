@@ -13,7 +13,6 @@ const ForgotPasswordPage = () => {
   const navigate = useNavigate()
   const { loading } = useSelector(state => state.auth)
   const inputs = useRef([])
-  const otpStage = useRef(null)
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
   const [digits, setDigits] = useState(Array(6).fill(''))
@@ -63,41 +62,21 @@ const ForgotPasswordPage = () => {
   }
 
   const animateOtpBoxes = () => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !otpStage.current) return Promise.resolve()
-    const stageRect = otpStage.current.getBoundingClientRect()
-    const centerX = stageRect.left + stageRect.width / 2
-    const centerY = stageRect.top + stageRect.height / 2
-    const radius = Math.min(88, stageRect.width * .25)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve()
     const boxes = inputs.current.filter(Boolean)
 
     return Promise.all(boxes.map((input, index) => {
-      const rect = input.getBoundingClientRect()
-      const inputX = rect.left + rect.width / 2
-      const inputY = rect.top + rect.height / 2
-      const startAngle = -Math.PI / 2 + index * (Math.PI * 2 / boxes.length)
-      const orbitX = centerX + Math.cos(startAngle) * radius
-      const orbitY = centerY + Math.sin(startAngle) * radius
       const keyframes = [
-        { transform: 'translate(0, 0) scale(1)', offset: 0 },
-        { transform: `translate(${orbitX - inputX}px, ${orbitY - inputY}px) scale(.78)`, offset: .18 },
+        { transform: 'translateY(0) scale(1)', filter: 'brightness(1)', offset: 0 },
+        { transform: 'translateY(-13px) scale(1.08)', filter: 'brightness(1.38)', offset: .3 },
+        { transform: 'translateY(5px) scale(.96)', filter: 'brightness(1.16)', offset: .58 },
+        { transform: 'translateY(-3px) scale(1.025)', filter: 'brightness(1.24)', offset: .78 },
+        { transform: 'translateY(0) scale(1)', filter: 'brightness(1)', offset: 1 },
       ]
-
-      for (let frame = 1; frame <= 30; frame += 1) {
-        const progress = frame / 30
-        // Increasing angles rotate clockwise in screen coordinates.
-        const angle = startAngle + progress * Math.PI * 2
-        const x = centerX + Math.cos(angle) * radius - inputX
-        const y = centerY + Math.sin(angle) * radius - inputY
-        keyframes.push({
-          transform: `translate(${x}px, ${y}px) scale(.78)`,
-          offset: .18 + progress * .64,
-        })
-      }
-
-      keyframes.push({ transform: 'translate(0, 0) scale(1)', offset: 1 })
       return input.animate(keyframes, {
-        duration: 1500,
-        easing: 'cubic-bezier(.4, 0, .2, 1)',
+        duration: 920,
+        delay: index * 95,
+        easing: 'cubic-bezier(.22, .8, .3, 1)',
       }).finished
     }))
   }
@@ -146,7 +125,7 @@ const ForgotPasswordPage = () => {
       <AnimatePresence mode="wait">
         {step === 1 && <motion.form key="email" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} onSubmit={sendCode} className="space-y-4"><label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-200">Email address</span><div className="relative"><HiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input autoFocus type="email" required value={email} onChange={event => setEmail(event.target.value)} className="w-full rounded-xl border border-white/15 bg-white/10 py-3 pl-10 pr-4 text-white outline-none placeholder:text-slate-500 focus:border-indigo-300 focus:ring-4 focus:ring-indigo-300/10" placeholder="you@example.com" /></div></label><button disabled={loading} className="w-full rounded-xl border border-white/25 bg-gradient-to-r from-indigo-400/80 to-violet-500/80 py-3 font-bold shadow-xl transition hover:-translate-y-0.5 disabled:opacity-60">{loading ? 'Sending code...' : 'Send verification code'}</button></motion.form>}
 
-        {step === 2 && <motion.form key="otp" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} onSubmit={verifyCode} className="space-y-4"><div ref={otpStage} className="otp-orbit-stage relative flex h-48 items-center justify-center" aria-live="polite"><div className={`otp-orbit-row flex gap-2 transition-all duration-500 ${status === 'checking' ? 'is-checking' : ''} ${status === 'success' || status === 'error' ? 'scale-75 opacity-0' : ''}`} onPaste={handlePaste}>{digits.map((digit, index) => <input key={index} ref={element => { inputs.current[index] = element }} aria-label={`OTP digit ${index + 1}`} inputMode="numeric" autoComplete={index === 0 ? 'one-time-code' : 'off'} maxLength="1" value={digit} onChange={event => updateDigit(index, event.target.value)} onKeyDown={event => handleKeyDown(index, event)} className={`otp-orbit-input h-14 w-11 rounded-xl text-center text-xl font-black text-white outline-none sm:h-16 sm:w-12 ${digit ? 'is-filled' : ''}`} />)}</div>{(status === 'success' || status === 'error') && <motion.div initial={{ scale: .5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`absolute grid h-16 w-16 place-items-center rounded-2xl border-2 text-3xl ${status === 'success' ? 'border-emerald-300 bg-emerald-400/15 text-emerald-300' : 'border-rose-300 bg-rose-400/15 text-rose-300'}`}>{status === 'success' ? <HiCheck /> : <HiX />}</motion.div>}</div><button disabled={loading || status === 'checking'} className="w-full rounded-xl border border-white/25 bg-gradient-to-r from-indigo-400/80 to-violet-500/80 py-3 font-bold shadow-xl disabled:opacity-60">{status === 'checking' ? 'Checking code...' : status === 'success' ? 'Verified' : 'Verify OTP'}</button><div className="flex items-center justify-between text-xs"><button type="button" onClick={() => setStep(1)} className="flex items-center gap-1 text-slate-300 hover:text-white"><HiArrowLeft /> Change email</button><button type="button" disabled={resendIn > 0 || loading} onClick={sendCode} className="flex items-center gap-1 font-bold text-indigo-200 disabled:text-slate-500"><HiRefresh /> {resendIn ? `Resend in ${resendIn}s` : 'Resend code'}</button></div></motion.form>}
+        {step === 2 && <motion.form key="otp" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} onSubmit={verifyCode} className="space-y-4"><div className="relative flex h-32 items-start justify-center pt-2" aria-live="polite"><div className={`otp-orbit-row flex gap-2 transition-all duration-500 ${status === 'checking' ? 'is-checking' : ''} ${status === 'success' || status === 'error' ? 'scale-75 opacity-0' : ''}`} onPaste={handlePaste}>{digits.map((digit, index) => <input key={index} ref={element => { inputs.current[index] = element }} aria-label={`OTP digit ${index + 1}`} inputMode="numeric" autoComplete={index === 0 ? 'one-time-code' : 'off'} maxLength="1" value={digit} onChange={event => updateDigit(index, event.target.value)} onKeyDown={event => handleKeyDown(index, event)} className={`otp-orbit-input h-14 w-11 rounded-xl text-center text-xl font-black text-white outline-none sm:h-16 sm:w-12 ${digit ? 'is-filled' : ''}`} />)}</div>{status === 'checking' && <motion.div initial={{ y: 8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="otp-verification-status" role="status"><HiShieldCheck /><span>Securely verifying</span><i /><i /><i /></motion.div>}{(status === 'success' || status === 'error') && <motion.div initial={{ scale: .5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`absolute top-2 grid h-16 w-16 place-items-center rounded-2xl border-2 text-3xl ${status === 'success' ? 'border-emerald-300 bg-emerald-400/15 text-emerald-300' : 'border-rose-300 bg-rose-400/15 text-rose-300'}`}>{status === 'success' ? <HiCheck /> : <HiX />}</motion.div>}</div><button disabled={loading || status === 'checking'} className="w-full rounded-xl border border-white/25 bg-gradient-to-r from-indigo-400/80 to-violet-500/80 py-3 font-bold shadow-xl disabled:opacity-60">{status === 'checking' ? 'Checking code...' : status === 'success' ? 'Verified' : 'Verify OTP'}</button><div className="flex items-center justify-between text-xs"><button type="button" onClick={() => setStep(1)} className="flex items-center gap-1 text-slate-300 hover:text-white"><HiArrowLeft /> Change email</button><button type="button" disabled={resendIn > 0 || loading} onClick={sendCode} className="flex items-center gap-1 font-bold text-indigo-200 disabled:text-slate-500"><HiRefresh /> {resendIn ? `Resend in ${resendIn}s` : 'Resend code'}</button></div></motion.form>}
 
         {step === 3 && <motion.form key="password" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} onSubmit={savePassword} className="space-y-4"><PasswordField label="New password" value={newPassword} onChange={setNewPassword} show={showPassword} toggle={() => setShowPassword(value => !value)} /><PasswordField label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} show={showPassword} /><div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-300"><p className="flex items-center gap-2 font-bold text-slate-200"><HiShieldCheck /> Password requirements</p><p className="mt-1">At least 8 characters and both entries must match.</p></div><button disabled={loading} className="w-full rounded-xl border border-white/25 bg-gradient-to-r from-indigo-400/80 to-violet-500/80 py-3 font-bold shadow-xl disabled:opacity-60">{loading ? 'Updating password...' : 'Reset password'}</button></motion.form>}
       </AnimatePresence>

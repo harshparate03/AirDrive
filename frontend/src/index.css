@@ -114,7 +114,7 @@
 .dark .admin-shell { background: radial-gradient(circle at 18% 5%,rgba(6,182,212,.10),transparent 28%), radial-gradient(circle at 82% 0%,rgba(99,102,241,.14),transparent 34%), #050914; }
 .admin-hero { background: linear-gradient(125deg,rgba(6,182,212,.94),rgba(79,70,229,.95) 48%,rgba(124,58,237,.95)); box-shadow: 0 24px 70px rgba(49,46,129,.22); }
 
-/* Clockwise OTP box orbit with bright theme-matched glass tiles. */
+/* Premium OTP secure-scan tiles. */
 .otp-orbit-input {
   border: 1.5px solid rgba(224, 231, 255, .4);
   background: linear-gradient(145deg, rgba(255, 255, 255, .2), rgba(129, 140, 248, .09));
@@ -147,6 +147,53 @@
   border-color: rgba(165, 243, 252, .95);
   background: linear-gradient(145deg, rgba(255, 255, 255, .34), rgba(99, 102, 241, .23));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 12px 30px rgba(15, 23, 42, .24), 0 0 24px rgba(103, 232, 249, .32);
+}
+
+.otp-verification-status {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid rgba(165, 243, 252, .24);
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, .28);
+  color: #dbeafe;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 10px 24px rgba(15, 23, 42, .14);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  backdrop-filter: blur(14px);
+}
+
+.otp-verification-status svg {
+  color: #a5f3fc;
+  font-size: 14px;
+}
+
+.otp-verification-status i {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: #a5f3fc;
+  animation: otp-status-pulse .9s ease-in-out infinite alternate;
+}
+
+.otp-verification-status i:nth-of-type(2) { animation-delay: .18s; }
+.otp-verification-status i:nth-of-type(3) { animation-delay: .36s; }
+
+@keyframes otp-status-pulse {
+  from { opacity: .28; transform: translateY(1px) scale(.75); }
+  to { opacity: 1; transform: translateY(-1px) scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otp-verification-status i { animation: none; opacity: .8; }
 }
 
 /* Progress bar */
