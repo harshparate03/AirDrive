@@ -109,8 +109,24 @@ GMAIL_FROM_NAME=AirDrive
 BREVO_API_KEY=<brevo-api-key>
 BREVO_FROM_EMAIL=<verified-brevo-sender>
 BREVO_FROM_NAME=AirDrive
+GOOGLE_APPS_SCRIPT_EMAIL_URL=https://script.google.com/macros/s/<deployment-id>/exec
+GOOGLE_APPS_SCRIPT_EMAIL_SECRET=<long-random-secret>
+GOOGLE_APPS_SCRIPT_FROM_NAME=AirDrive
 CLIENT_URL=https://air-drive-snowy.vercel.app
 ```
+
+### Free Gmail delivery with Google Apps Script
+
+Render Free blocks SMTP ports. To send low-volume transactional email through Gmail over HTTPS:
+
+1. Create a project at `https://script.google.com` while signed in to the sending Gmail account.
+2. Paste `google-apps-script/Code.gs` into the Apps Script editor.
+3. In **Project Settings > Script properties**, add `AIRDRIVE_EMAIL_SECRET` with a long random value.
+4. Choose **Deploy > New deployment > Web app**. Execute as **Me** and allow access to **Anyone**.
+5. Authorize Gmail access and copy the deployed `/exec` URL.
+6. Add the URL and the same secret to the Render backend using the variables above, then redeploy.
+
+Google Apps Script is selected before Brevo and SMTP when both URL and secret are configured.
 
 ## Google OAuth
 

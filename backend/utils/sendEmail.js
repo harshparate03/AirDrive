@@ -13,6 +13,12 @@ const getBrevoConfig = () => ({
   fromName: process.env.BREVO_FROM_NAME || process.env.GMAIL_FROM_NAME || 'AirDrive',
 });
 
+const getAppsScriptConfig = () => ({
+  url: process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL || '',
+  secret: process.env.GOOGLE_APPS_SCRIPT_EMAIL_SECRET || '',
+  fromName: process.env.GOOGLE_APPS_SCRIPT_FROM_NAME || process.env.GMAIL_FROM_NAME || 'AirDrive',
+});
+
 const createTransporter = () => {
   const { user, pass } = getEmailConfig();
   if (!user || !pass) {
@@ -31,6 +37,26 @@ const createTransporter = () => {
 };
 
 const sendTransactionalEmail = async ({ to, subject, html }) => {
+  const appsScript = getAppsScriptConfig();
+  if (appsScript.url && appsScript.secret) {
+    try {
+      const response = await axios.post(appsScript.url, {
+        secret: appsScript.secret,
+        fromName: appsScript.fromName,
+        to,
+        subject,
+        html,
+      }, { timeout: 20000 });
+      if (!response.data?.ok) throw new Error(response.data?.error || 'Google Apps Script rejected the email');
+    } catch (error) {
+      const providerMessage = error.response?.data?.error || error.message;
+      const safeError = new Error(`Google Apps Script email rejected: ${providerMessage}`);
+      safeError.status = error.response?.status;
+      throw safeError;
+    }
+    return;
+  }
+
   const brevo = getBrevoConfig();
   if (brevo.apiKey) {
     if (!brevo.fromEmail) throw new Error('Brevo sender is not configured. Set BREVO_FROM_EMAIL.');
@@ -112,5 +138,6 @@ module.exports = {
   sendTransactionalEmail,
   getEmailConfig,
   getBrevoConfig,
+  getAppsScriptConfig,
   createTransporter,
 };

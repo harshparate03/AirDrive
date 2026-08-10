@@ -195,7 +195,7 @@ router.post('/forgot-password', async (req, res) => {
       await sendOTPEmail(user.email, user.name, otp);
     } catch (err) {
       console.error('OTP email send failed:', err.message, err.status || '');
-      const detail = err.message?.startsWith('Brevo email rejected:') ? err.message : null;
+      const detail = /^(Brevo|Google Apps Script) email rejected:/.test(err.message || '') ? err.message : null;
       return res.status(500).json({
         error: 'Failed to send OTP email. Please try again.',
         ...(detail && { detail }),
