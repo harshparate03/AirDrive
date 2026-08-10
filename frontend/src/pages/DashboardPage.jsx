@@ -95,7 +95,7 @@ const DashboardPage = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Greeting */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-dark-900 dark:text-white">
             {greeting()}, {user?.name?.split(' ')[0]} 👋
@@ -104,7 +104,7 @@ const DashboardPage = () => {
             Here&apos;s what&apos;s happening with your files today.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3">
           <ViewModeToggle />
           <QuickUpload />
         </div>

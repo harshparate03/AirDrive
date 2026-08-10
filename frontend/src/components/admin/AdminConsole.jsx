@@ -400,7 +400,7 @@ const Overview = ({ data }) => {
           and infrastructure from a purpose-built administration workspace.
         </p>
       </section>
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(([l, v, I], n) => (
           <article className="glass-panel p-5" key={l}>
             <div

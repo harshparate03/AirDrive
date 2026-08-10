@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useSelector, useDispatch } from 'react-redux'
-import { HiX, HiDownload, HiShare, HiStar, HiExternalLink } from 'react-icons/hi'
+import { HiX, HiDownload, HiExternalLink } from 'react-icons/hi'
 import { closeModal } from '../../store/slices/uiSlice'
 import api, { downloadFile } from '../../services/api'
 import { getFileIcon, formatFileSize } from '../../utils/fileUtils'
@@ -117,12 +117,12 @@ const FilePreviewModal = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="modal-backdrop bg-black/60">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="card w-full max-w-2xl overflow-hidden"
+        className="modal-surface card w-full max-w-2xl overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-dark-700">

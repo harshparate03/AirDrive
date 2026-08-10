@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   HiInbox, HiPlus, HiLink, HiTrash, HiClock,
   HiUpload, HiX, HiCheck, HiDocument,
@@ -31,11 +31,11 @@ const CreateRequestModal = ({ onClose, onCreated }) => {
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="card w-full max-w-md p-6 space-y-4"
+        className="card max-h-[calc(100dvh-1rem)] w-full max-w-md space-y-4 overflow-y-auto rounded-b-none p-4 sm:rounded-2xl sm:p-6"
       >
         <div className="flex items-center gap-3">
           <HiInbox className="text-primary-500 text-xl" />
@@ -113,14 +113,14 @@ const FileRequestPage = () => {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-dark-900 dark:text-white">File Requests</h1>
           <p className="text-sm text-dark-500 dark:text-dark-400 mt-0.5">
             Create a link so others can upload files directly to your Drive
           </p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setShowCreate(true)} className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto">
           <HiPlus /> New Request
         </button>
       </div>

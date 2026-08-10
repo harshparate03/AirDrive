@@ -2,12 +2,11 @@ import React, { useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useDispatch, useSelector } from 'react-redux'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { HiX, HiClock, HiUpload, HiDownload, HiRefresh } from 'react-icons/hi'
+import { HiX, HiClock, HiUpload, HiRefresh } from 'react-icons/hi'
 import { closeModal } from '../../store/slices/uiSlice'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 import { formatFileSize } from '../../utils/fileUtils'
-import useUpload from '../../hooks/useUpload'
 
 const VersionHistoryModal = () => {
   const dispatch = useDispatch()
@@ -49,12 +48,12 @@ const VersionHistoryModal = () => {
   const versions = [...(file.versions || [])].reverse()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="modal-backdrop">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="card w-full max-w-md overflow-hidden"
+        className="modal-surface card w-full max-w-md overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-dark-700">
@@ -115,7 +114,7 @@ const VersionHistoryModal = () => {
                     <span>·</span>
                     <span>{new Date(v.uploadedAt).toLocaleString()}</span>
                   </div>
-                  {v.note && <p className="text-xs text-dark-400 mt-0.5 italic">"{v.note}"</p>}
+                  {v.note && <p className="text-xs text-dark-400 mt-0.5 italic">&ldquo;{v.note}&rdquo;</p>}
                 </div>
                 {v.versionNumber !== file.currentVersion && (
                   <button

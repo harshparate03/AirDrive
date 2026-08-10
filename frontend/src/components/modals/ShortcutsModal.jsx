@@ -32,12 +32,12 @@ const ShortcutsModal = () => {
   const dispatch = useDispatch()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="modal-backdrop">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="card w-full max-w-sm overflow-hidden"
+        className="modal-surface card w-full max-w-sm overflow-hidden"
       >
         <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-dark-700">
           <HiLightningBolt className="text-primary-500 text-lg" />

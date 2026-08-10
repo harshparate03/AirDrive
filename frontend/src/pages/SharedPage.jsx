@@ -35,7 +35,7 @@ const SharedPage = () => {
 
   return (
     <div className="space-y-4 animate-fade-in">
-<div className="flex items-center justify-between">
+<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-dark-900 dark:text-white">Shared With Me</h1>
           <span className="badge bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400">

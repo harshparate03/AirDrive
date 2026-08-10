@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 
 const AuthLayout = ({ children }) => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-900 via-dark-900 to-dark-950 relative overflow-hidden">
+    <div className="relative flex min-h-screen min-h-[100dvh] items-center justify-center overflow-x-hidden bg-gradient-to-br from-primary-900 via-dark-900 to-dark-950 px-3 py-6 sm:px-4">
       {/* Animated blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div

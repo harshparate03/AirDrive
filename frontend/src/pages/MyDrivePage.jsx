@@ -3,8 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  HiPlus, HiFolderAdd, HiUpload, HiViewGrid, HiViewList,
-  HiSortAscending, HiFilter,
+  HiFolderAdd, HiUpload,
 } from 'react-icons/hi'
 import api from '../services/api'
 import FileGrid from '../components/files/FileGrid'
@@ -59,12 +58,12 @@ const MyDrivePage = () => {
     >
       <div className="space-y-4 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-bold text-dark-900 dark:text-white">My Drive</h1>
             <Breadcrumb items={[{ label: 'My Drive', to: '/my-drive' }]} />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 sm:w-auto sm:pb-0">
             <ViewModeToggle />
             <button
               onClick={() => setShowCreateFolder(true)}
@@ -87,7 +86,7 @@ const MyDrivePage = () => {
         {selectedFiles.length > 0 && <FileToolbar onRefresh={handleRefresh} />}
 
         {/* Sort & Filter */}
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-3 overflow-x-auto pb-1 text-sm">
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}

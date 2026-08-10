@@ -50,7 +50,7 @@ const FolderPage = () => {
     <UploadDropzone folderId={folderId}>
       <div className="space-y-4 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
               <button onClick={() => navigate(-1)} className="btn-ghost p-1.5 text-dark-400">
@@ -62,7 +62,7 @@ const FolderPage = () => {
             </div>
             <Breadcrumb items={breadcrumbItems} />
           </div>
-<div className="flex items-center gap-2">
+<div className="flex w-full items-center gap-2 overflow-x-auto pb-1 sm:w-auto sm:pb-0">
             <ViewModeToggle />
             <button onClick={() => setShowCreateFolder(true)} className="btn-secondary text-sm flex items-center gap-2">
               <HiFolderAdd /> New Folder

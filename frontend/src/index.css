@@ -103,6 +103,8 @@
   .glass-panel { @apply rounded-2xl border border-white/60 bg-white/55 shadow-glass backdrop-blur-2xl dark:border-white/10 dark:bg-slate-900/55; }
   .glass-control { @apply rounded-xl border border-white/60 bg-white/50 text-slate-600 shadow-sm backdrop-blur-xl transition hover:bg-white/80 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10; }
   .touch-target { @apply min-h-11 min-w-11; }
+  .modal-backdrop { @apply fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4; }
+  .modal-surface { @apply max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-b-none sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl; }
   .admin-table { @apply w-full min-w-[800px] text-left text-sm; }
   .admin-table th { @apply border-b border-white/30 bg-white/25 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/[.03]; }
   .admin-table td { @apply border-b border-white/30 px-4 py-3 align-middle dark:border-white/10; }

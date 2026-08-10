@@ -27,11 +27,11 @@ const RenameModal = () => {
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="modal-backdrop">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="card p-6 w-full max-w-sm"
+        className="modal-surface card w-full max-w-sm p-5 sm:p-6"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-dark-800 dark:text-dark-100 flex items-center gap-2">
