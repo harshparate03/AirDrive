@@ -1,6 +1,5 @@
 import React from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
 import { HiTrash, HiRefresh, HiExclamation, HiFolder } from 'react-icons/hi'
 import { useSelector } from 'react-redux'
 import api from '../services/api'
@@ -42,14 +41,6 @@ const TrashPage = () => {
     },
   })
 
-  const restoreMutation = useMutation({
-    mutationFn: (fileId) => api.post('/files/trash', { fileId, restore: true }),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['trash'])
-      toast.success('File restored')
-    },
-  })
-
   const restoreFolderMutation = useMutation({
     mutationFn: (folderId) => api.post(`/folders/${folderId}/restore`),
     onSuccess: () => {
@@ -75,12 +66,12 @@ const TrashPage = () => {
 
   return (
     <div className="space-y-4 animate-fade-in">
-<div className="flex items-center justify-between">
+<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-dark-900 dark:text-white">Trash</h1>
           <p className="text-sm text-dark-500 dark:text-dark-400 mt-0.5">Files are deleted permanently after 30 days</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 sm:w-auto sm:pb-0">
           <ViewModeToggle />
           {!isEmpty && (
             <button

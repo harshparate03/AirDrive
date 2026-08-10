@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   HiSparkles, HiPaperAirplane, HiDocument, HiTag, HiSearch,
-  HiDuplicate, HiFolder, HiLightningBolt, HiRefresh, HiX,
+  HiDuplicate, HiFolder, HiLightningBolt,
 } from 'react-icons/hi'
 import api from '../services/api'
 import toast from 'react-hot-toast'
@@ -29,7 +29,7 @@ const Message = ({ msg }) => (
         <HiSparkles className="text-white text-sm" />
       </div>
     )}
-    <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+    <div className={`max-w-[88%] px-3 py-2.5 sm:max-w-[75%] sm:px-4 sm:py-3 rounded-2xl text-sm leading-relaxed ${
       msg.role === 'user'
         ? 'bg-primary-600 text-white rounded-br-sm'
         : 'bg-white dark:bg-dark-800 text-dark-700 dark:text-dark-200 border border-slate-100 dark:border-dark-700 rounded-bl-sm'
@@ -191,7 +191,7 @@ const AIAssistantPage = () => {
       </div>
 
       {/* Right: Main panel */}
-      <div className="flex-1 min-h-[620px] lg:min-h-0 flex flex-col card overflow-hidden">
+      <div className="flex h-[calc(100dvh-11rem)] min-h-[500px] flex-1 flex-col overflow-hidden card lg:h-auto lg:min-h-0">
         {/* Header */}
         <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-dark-700">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">

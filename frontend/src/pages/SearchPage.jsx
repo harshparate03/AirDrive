@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { HiSearch } from 'react-icons/hi'
@@ -24,10 +24,10 @@ const SearchPage = () => {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-dark-900 dark:text-white">Search Results</h1>
-          {q && <p className="text-dark-500 dark:text-dark-400 text-sm mt-0.5">Results for "{q}"</p>}
+          {q && <p className="text-dark-500 dark:text-dark-400 text-sm mt-0.5">Results for &ldquo;{q}&rdquo;</p>}
         </div>
         <ViewModeToggle />
       </div>

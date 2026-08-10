@@ -22,7 +22,7 @@ const StarredPage = () => {
 
 return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-dark-900 dark:text-white">Starred</h1>
         <ViewModeToggle />
       </div>
