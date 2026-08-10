@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -15,11 +15,15 @@ import { setNotifications } from '../../store/slices/notificationSlice'
 const TopBar = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const { theme, viewMode } = useSelector(state => state.ui)
   const { unreadCount } = useSelector(state => state.notifications)
   const [search, setSearch] = useState('')
   const [showNotifications, setShowNotifications] = useState(false)
   const notifRef = useRef(null)
+  const supportsFileView = ['/my-drive', '/recent', '/starred', '/trash', '/shared', '/search']
+    .some(path => location.pathname === path || location.pathname.startsWith(`${path}/`))
+    || location.pathname.startsWith('/folder/')
 
   // Fetch notifications
   const { data: notifData } = useQuery({
@@ -111,7 +115,7 @@ const TopBar = () => {
       {/* Right actions */}
       <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         {/* View mode toggle */}
-        <div className="hidden items-center rounded-xl border border-slate-200 dark:border-dark-700 overflow-hidden sm:flex">
+        {supportsFileView && <div className="hidden items-center rounded-xl border border-slate-200 dark:border-dark-700 overflow-hidden sm:flex">
           <button
             onClick={() => dispatch(setViewMode('grid'))}
             className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600' : 'text-dark-400 hover:text-dark-600 dark:hover:text-dark-300'}`}
@@ -124,7 +128,7 @@ const TopBar = () => {
           >
             <HiViewList />
           </button>
-        </div>
+        </div>}
 
         {/* Theme toggle */}
         <button

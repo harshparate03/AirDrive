@@ -15,7 +15,7 @@ const StatCard = ({ label, value, icon: Icon, color = 'blue', subValue, trend, l
 
   if (loading) {
     return (
-      <div className="card p-4 space-y-3">
+      <div className="card h-full min-h-48 space-y-3 p-4 sm:p-5">
         <div className="skeleton h-4 w-24" />
         <div className="skeleton h-8 w-16" />
         <div className="skeleton h-3 w-20" />
@@ -24,7 +24,7 @@ const StatCard = ({ label, value, icon: Icon, color = 'blue', subValue, trend, l
   }
 
   return (
-    <motion.div whileHover={{ y: -3 }} className={`card relative overflow-hidden border bg-gradient-to-br p-4 sm:p-5 ${c.surface} ${c.ring}`}>
+    <motion.div whileHover={{ y: -3 }} className={`card relative flex h-full min-h-48 flex-col overflow-hidden border bg-gradient-to-br p-4 sm:p-5 ${c.surface} ${c.ring}`}>
       <span className={`absolute inset-x-0 top-0 h-1 ${c.accent}`} aria-hidden="true" />
       <div className="mb-4 flex items-start justify-between">
         <div className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-lg ${c.iconBg}`}>
@@ -33,12 +33,14 @@ const StatCard = ({ label, value, icon: Icon, color = 'blue', subValue, trend, l
       </div>
       <p className="text-2xl font-black tracking-tight text-dark-900 dark:text-white sm:text-3xl">{value}</p>
       <p className="mt-1 text-xs font-bold uppercase tracking-wider text-dark-500 dark:text-dark-400">{label}</p>
-      {subValue && <p className="text-xs text-dark-400 mt-1">{subValue}</p>}
+      <div className="mt-auto min-h-5 pt-1">
+      {subValue && <p className="text-xs text-dark-400">{subValue}</p>}
       {trend && (
-        <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+        <p className="flex items-center gap-1 text-xs text-green-500">
           <span>↑</span>{trend}
         </p>
       )}
+      </div>
     </motion.div>
   )
 }

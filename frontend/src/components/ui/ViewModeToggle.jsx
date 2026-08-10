@@ -5,7 +5,7 @@ import { setViewMode } from '../../store/slices/uiSlice'
 
 /**
  * Grid / List view toggle that persists to localStorage via the ui slice.
- * Reused across all file pages (Dashboard, MyDrive, Recent, Starred,
+ * Reused only where file results can switch layout (Dashboard, MyDrive, Recent, Starred,
  * Shared, Search, Trash, Folder) so the preference is consistent.
  */
 const ViewModeToggle = ({ className = '' }) => {
@@ -18,7 +18,7 @@ const ViewModeToggle = ({ className = '' }) => {
         onClick={() => dispatch(setViewMode('grid'))}
         title="Grid view"
         aria-label="Grid view"
-        className={`p-1.5 rounded-md transition-all ${
+        className={`flex h-9 w-9 items-center justify-center rounded-md transition-all ${
           viewMode === 'grid'
             ? 'bg-white dark:bg-dark-700 text-primary-600 dark:text-primary-400 shadow-sm'
             : 'text-dark-400 hover:text-dark-600 dark:hover:text-dark-200'
@@ -30,7 +30,7 @@ const ViewModeToggle = ({ className = '' }) => {
         onClick={() => dispatch(setViewMode('list'))}
         title="List view"
         aria-label="List view"
-        className={`p-1.5 rounded-md transition-all ${
+        className={`flex h-9 w-9 items-center justify-center rounded-md transition-all ${
           viewMode === 'list'
             ? 'bg-white dark:bg-dark-700 text-primary-600 dark:text-primary-400 shadow-sm'
             : 'text-dark-400 hover:text-dark-600 dark:hover:text-dark-200'
