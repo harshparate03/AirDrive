@@ -66,31 +66,33 @@ const TopBar = () => {
   }
 
   return (
-    <header className="flex items-center gap-4 px-6 py-3 bg-white dark:bg-dark-900 border-b border-slate-100 dark:border-dark-800 sticky top-0 z-10">
+    <header className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 md:gap-4 md:px-6 md:py-3 bg-white dark:bg-dark-900 border-b border-slate-100 dark:border-dark-800 sticky top-0 z-20">
       {/* Menu toggle */}
       <button
         onClick={() => dispatch(toggleSidebar())}
-        className="btn-ghost p-2 text-dark-500 md:hidden"
+        className="touch-target btn-ghost shrink-0 p-2 text-dark-500 md:hidden"
+        aria-label="Open navigation menu"
       >
         <HiMenu className="text-xl" />
       </button>
 
       {/* Search bar */}
-      <form onSubmit={handleSearch} className="flex-1 max-w-xl">
+      <form onSubmit={handleSearch} className="min-w-0 flex-1 max-w-xl">
         <div className="relative flex items-center">
           <HiSearch className="absolute left-3.5 text-dark-400 text-lg pointer-events-none" />
           <input
             type="text"
-            placeholder="Search files, folders, AI tags..."
+            placeholder="Search files..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="input pl-10 pr-10 h-10 text-sm"
+            className="input h-11 pl-9 pr-9 text-sm sm:pl-10 sm:pr-10"
           />
           {search && (
             <button
               type="button"
               onClick={() => setSearch('')}
-              className="absolute right-10 text-dark-400 hover:text-dark-600 p-1"
+              className="touch-target absolute right-8 text-dark-400 hover:text-dark-600 sm:right-10"
+              aria-label="Clear search"
             >
               <HiX />
             </button>
@@ -98,7 +100,7 @@ const TopBar = () => {
           <button
             type="button"
             onClick={handleVoiceSearch}
-            className="absolute right-3 text-dark-400 hover:text-primary-500 transition-colors"
+            className="touch-target absolute right-0 hidden text-dark-400 hover:text-primary-500 transition-colors sm:flex"
             title="Voice search"
           >
             <HiMicrophone />
@@ -107,9 +109,9 @@ const TopBar = () => {
       </form>
 
       {/* Right actions */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         {/* View mode toggle */}
-        <div className="flex items-center rounded-xl border border-slate-200 dark:border-dark-700 overflow-hidden">
+        <div className="hidden items-center rounded-xl border border-slate-200 dark:border-dark-700 overflow-hidden sm:flex">
           <button
             onClick={() => dispatch(setViewMode('grid'))}
             className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600' : 'text-dark-400 hover:text-dark-600 dark:hover:text-dark-300'}`}
@@ -127,7 +129,8 @@ const TopBar = () => {
         {/* Theme toggle */}
         <button
           onClick={() => dispatch(toggleTheme())}
-          className="btn-ghost p-2.5 text-dark-500"
+          className="touch-target btn-ghost p-2 text-dark-500 sm:p-2.5"
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
         >
           <AnimatePresence mode="wait">
@@ -147,7 +150,8 @@ const TopBar = () => {
         <div ref={notifRef} className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="btn-ghost p-2.5 text-dark-500 relative"
+            className="touch-target btn-ghost relative p-2 text-dark-500 sm:p-2.5"
+            aria-label="Open notifications"
           >
             <HiBell className="text-xl" />
             {unreadCount > 0 && (
