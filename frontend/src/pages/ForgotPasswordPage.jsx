@@ -103,12 +103,15 @@ const ForgotPasswordPage = () => {
     if (otp.length !== 6) return toast.error('Enter all 6 digits')
     setStatus('checking')
     try {
+      // Let the decorative animation continue independently. Navigation should
+      // never wait for its full duration after the API has verified the code.
+      animateOtpBoxes().catch(() => {})
       const [token] = await Promise.all([
         dispatch(verifyOtp({ email, otp })).unwrap(),
-        animateOtpBoxes(),
+        new Promise(resolve => window.setTimeout(resolve, 450)),
       ])
       setResetToken(token); setStatus('success')
-      setTimeout(() => setStep(3), 650)
+      setTimeout(() => setStep(3), 320)
     } catch (error) {
       setStatus('error'); toast.error(error || 'Invalid verification code')
       setTimeout(() => { setDigits(Array(6).fill('')); setStatus('idle'); inputs.current[0]?.focus() }, 900)
