@@ -3,6 +3,10 @@
  * Add AIRDRIVE_EMAIL_SECRET in Project Settings > Script properties,
  * then deploy this project as a web app executed as yourself.
  */
+function doGet() {
+  return jsonResponse({ ok: true, service: 'AirDrive Email Relay' });
+}
+
 function doPost(e) {
   try {
     var payload = JSON.parse((e.postData && e.postData.contents) || '{}');
