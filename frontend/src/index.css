@@ -248,7 +248,7 @@
   background: currentColor;
   box-shadow: 0 0 9px currentColor;
   opacity: 0;
-  animation: otp-particle-spray .72s cubic-bezier(.16, .8, .3, 1) forwards;
+  animation: otp-particle-spray 1.05s cubic-bezier(.16, .8, .3, 1) forwards;
   animation-delay: var(--particle-delay);
 }
 
