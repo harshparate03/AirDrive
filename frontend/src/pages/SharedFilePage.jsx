@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { HiDownload, HiLockClosed, HiFolder, HiExternalLink, HiCloudUpload, HiEye } from 'react-icons/hi'
+import BrandLogo from '../components/ui/BrandLogo'
 import api, { shareDownload, sharePreview, sharePreviewInfo } from '../services/api'
 import { getFileIcon, formatFileSize } from '../utils/fileUtils'
 import { saveFileResponse } from '../utils/fileActions'
@@ -147,9 +148,7 @@ const SharedFilePage = () => {
       >
         {/* Header */}
         <div className="flex items-center gap-3 p-5 border-b border-slate-100 dark:border-dark-700">
-          <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
-            <HiCloudUpload className="text-primary-500 text-xl" />
-          </div>
+          <BrandLogo className="h-10 w-10" iconClassName="text-xl" />
           <div>
             <p className="font-bold text-primary-600 dark:text-primary-400">Air Drive</p>
             <p className="text-xs text-dark-400">Shared file</p>

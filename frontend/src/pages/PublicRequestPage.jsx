@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { HiInbox, HiUpload, HiDocument, HiCheck, HiCloudUpload, HiX } from 'react-icons/hi'
+import BrandLogo from '../components/ui/BrandLogo'
 import api from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -79,9 +80,7 @@ const PublicRequestPage = () => {
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-6 text-white">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <HiCloudUpload className="text-xl" />
-            </div>
+            <BrandLogo className="h-10 w-10 ring-1 ring-white/30" iconClassName="text-xl" />
             <div>
               <p className="text-sm font-medium opacity-80">Air Drive · File Request</p>
               <p className="text-xs opacity-60">from {request.userId?.name}</p>
