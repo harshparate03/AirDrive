@@ -292,13 +292,13 @@ const AIAssistantPage = () => {
                   <button type="button" onClick={() => setSelectedFile(null)} className="rounded p-0.5 hover:bg-primary-100 dark:hover:bg-primary-900/40" aria-label="Remove attached file"><HiX /></button>
                 </div>
               )}
-              <div className="flex gap-3">
+              <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm transition focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 dark:border-dark-600 dark:bg-dark-800 dark:focus-within:border-primary-500 dark:focus-within:ring-primary-900/30">
                 <input ref={chatFileRef} type="file" className="hidden" onChange={handleChatFile} />
                 <button
                   type="button"
                   onClick={() => chatFileRef.current?.click()}
                   disabled={attachmentUploading || chatMutation.isPending}
-                  className="btn-secondary self-end px-3"
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-dark-500 transition hover:bg-slate-100 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-dark-300 dark:hover:bg-dark-700 dark:hover:text-primary-400"
                   aria-label="Upload and attach a file"
                   title="Upload and attach a file"
                 >
@@ -310,12 +310,12 @@ const AIAssistantPage = () => {
                   onKeyDown={handleKeyDown}
                   placeholder={selectedFile ? `Ask about ${selectedFile.name}...` : "Ask anything about your files..."}
                   rows={2}
-                  className="input resize-none flex-1 text-sm"
+                  className="min-h-10 max-h-32 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm text-dark-800 outline-none placeholder:text-dark-400 dark:text-dark-100"
                 />
                 <button
                   onClick={handleSend}
                   disabled={!input.trim() || chatMutation.isPending || attachmentUploading}
-                  className="btn-primary px-4 self-end"
+                  className="btn-primary flex h-10 w-10 flex-shrink-0 items-center justify-center self-end rounded-xl p-0"
                 >
                   <HiPaperAirplane className="rotate-90" />
                 </button>
