@@ -151,8 +151,8 @@ const DashboardPage = () => {
             </div>
           </div>
           {viewMode === 'grid'
-            ? <FileGrid files={recentFilesData?.files || []} />
-            : <FileList files={recentFilesData?.files || []} />
+            ? <FileGrid files={recentFilesData?.files || []} selectable={false} />
+            : <FileList files={recentFilesData?.files || []} selectable={false} />
           }
         </div>
 

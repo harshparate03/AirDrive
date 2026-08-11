@@ -10,12 +10,12 @@ import { saveFileResponse } from '../../utils/fileActions'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../ui/ConfirmDialog'
 
-const FileRow = ({ file, onRefresh, showRestore }) => {
+const FileRow = ({ file, onRefresh, showRestore, selectable }) => {
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
   const confirm = useConfirm()
   const { selectedFiles } = useSelector(state => state.ui)
-  const isSelected = selectedFiles.includes(file._id)
+  const isSelected = selectable && selectedFiles.includes(file._id)
 
   const starMutation = useMutation({
     mutationFn: () => api.post('/files/star', { fileId: file._id }),
@@ -59,14 +59,16 @@ const restoreMutation = useMutation({
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       onContextMenu={e => { e.preventDefault(); dispatch(setContextMenu({ x: e.clientX, y: e.clientY, file, type: 'file' })) }}
-      onClick={() => dispatch(toggleFileSelection(file._id))}
+      onClick={() => selectable && dispatch(toggleFileSelection(file._id))}
       onDoubleClick={() => !showRestore && dispatch(openModal({ modal: 'filePreview', data: file }))}
+      aria-selected={isSelected}
       className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer group transition-all hover:bg-slate-50 dark:hover:bg-dark-800 ${isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`}
     >
       {/* Checkbox */}
-      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${isSelected ? 'bg-primary-500 border-primary-500' : 'border-slate-200 dark:border-dark-600 opacity-0 group-hover:opacity-100'}`}>
+      {selectable && <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 bg-white dark:bg-dark-800 transition-all ${isSelected ? 'bg-primary-500 dark:bg-primary-500 border-primary-500' : 'border-slate-300 dark:border-dark-500'}`}>
         {isSelected && <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="2,6 5,9 10,3"/></svg>}
-      </div>
+      </div>}
+      {!selectable && <div className="w-5 flex-shrink-0" />}
 
       {/* Icon */}
       <div className={`w-9 h-9 rounded-xl ${color} bg-opacity-15 flex items-center justify-center flex-shrink-0`}>
@@ -124,7 +126,7 @@ const restoreMutation = useMutation({
   )
 }
 
-const FileList = ({ files, onRefresh, showRestore }) => {
+const FileList = ({ files, onRefresh, showRestore = false, selectable = !showRestore }) => {
   if (!files?.length) return null
 
   return (
@@ -139,7 +141,7 @@ const FileList = ({ files, onRefresh, showRestore }) => {
       </div>
       {files.map((file, i) => (
         <motion.div key={file._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}>
-          <FileRow file={file} onRefresh={onRefresh} showRestore={showRestore} />
+          <FileRow file={file} onRefresh={onRefresh} showRestore={showRestore} selectable={selectable} />
         </motion.div>
       ))}
     </div>
