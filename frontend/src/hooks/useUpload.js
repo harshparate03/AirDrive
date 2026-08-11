@@ -20,20 +20,20 @@ const useUpload = (folderId = null) => {
     if (file.webkitRelativePath) formData.append('relativePath', file.webkitRelativePath)
 
     try {
-      await uploadFiles(formData, (progress) => {
+      const response = await uploadFiles(formData, (progress) => {
         // Per-file progress (each file is uploaded in its own request)
         // Reserve the final 5% for server-side storage/database processing.
         dispatch(updateProgress({ id, progress: Math.min(progress, 95) }))
       })
       dispatch(setUploadStatus({ id, status: 'completed' }))
-      return true
+      return response.data?.files || []
     } catch (error) {
       dispatch(setUploadStatus({
         id,
         status: 'error',
         error: error.response?.data?.error || 'Upload failed',
       }))
-      return false
+      return []
     }
   }
 
@@ -53,10 +53,14 @@ const useUpload = (folderId = null) => {
     // Upload files one at a time (sequential) for stable per-file progress
     dispatch(setIsUploading(true))
     let successCount = 0
+    const uploadedFiles = []
 
     for (const item of queueItems) {
-      const ok = await uploadOne(item.file, item.id)
-      if (ok) successCount += 1
+      const uploaded = await uploadOne(item.file, item.id)
+      if (uploaded.length) {
+        successCount += 1
+        uploadedFiles.push(...uploaded)
+      }
     }
 
     dispatch(setIsUploading(false))
@@ -73,6 +77,8 @@ const useUpload = (folderId = null) => {
     if (successCount < fileArray.length) {
       toast.error(`${fileArray.length - successCount} file${fileArray.length - successCount > 1 ? 's' : ''} failed to upload`)
     }
+
+    return uploadedFiles
   }
 
   return { upload }

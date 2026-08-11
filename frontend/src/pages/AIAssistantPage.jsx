@@ -134,6 +134,22 @@ const AIAssistantPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  useEffect(() => {
+    const handleContextUpload = (event) => {
+      const uploadedFile = event.detail?.file
+      if (!uploadedFile) return
+      setSelectedFile(uploadedFile)
+      setActiveFeature('chat')
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `${uploadedFile.name} is uploaded and selected. Ask me a question about this file.`,
+      }])
+      queryClient.invalidateQueries({ queryKey: ['files-for-ai'] })
+    }
+    window.addEventListener('airdrive:ai-context-uploaded', handleContextUpload)
+    return () => window.removeEventListener('airdrive:ai-context-uploaded', handleContextUpload)
+  }, [queryClient])
+
   const handleSend = () => {
     if (!input.trim()) return
     const userMsg = { role: 'user', content: input }
@@ -199,7 +215,7 @@ const AIAssistantPage = () => {
           </select>
           <button
             type="button"
-            onClick={() => dispatch(openModal({ modal: 'upload' }))}
+            onClick={() => dispatch(openModal({ modal: 'upload', data: { selectForAI: true } }))}
             className="btn-secondary mt-2 flex w-full items-center justify-center gap-2 text-xs"
           >
             <HiUpload /> Upload a context file
@@ -266,7 +282,10 @@ const AIAssistantPage = () => {
                   <HiPaperAirplane className="rotate-90" />
                 </button>
               </div>
-              <p className="text-xs text-dark-400 mt-1.5">Press Enter to send, Shift+Enter for new line</p>
+              <p className="text-xs text-dark-400 mt-1.5">
+                {selectedFile ? `Questions will use ${selectedFile.name} as context. ` : 'Upload or select a context file to ask about its contents. '}
+                Press Enter to send, Shift+Enter for new line.
+              </p>
             </div>
           </>
         )}

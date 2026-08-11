@@ -35,14 +35,13 @@ router.get('/status', authenticate, (req, res) => {
 // POST /api/ai/chat - Chat with file / general AI chat
 router.post('/chat', authenticate, async (req, res) => {
   const start = Date.now();
+  const { message, fileId, conversationHistory = [] } = req.body;
+  let contextFile = null;
   try {
-    const { message, fileId, conversationHistory = [] } = req.body;
     if (!message) return res.status(400).json({ error: 'Message required' });
 
     let systemPrompt = 'You are Air Drive AI Assistant, a helpful assistant for managing cloud files and documents.';
     let fileContext = '';
-    let contextFile = null;
-
     if (fileId) {
       const file = await File.findOne({ _id: fileId, userId: req.user._id });
       if (file) {
@@ -95,6 +94,13 @@ router.post('/chat', authenticate, async (req, res) => {
     res.json({ response, tokens });
   } catch (error) {
     console.error('AI chat error:', error);
+    const quotaUnavailable = error.status === 429 || error.code === 'insufficient_quota' || /no credits|quota/i.test(error.message || '');
+    if (quotaUnavailable) {
+      const response = answerLocally({ message, file: contextFile, content: contextFile?.ocrText });
+      await AIHistory.create({ userId: req.user._id, fileId: fileId || null, type: 'chat', prompt: message, response, model: 'local-fallback', duration: Date.now() - start });
+      await logActivityFn({ userId: req.user._id, action: 'ai_chat', fileId: fileId || null, details: 'Used local fallback because provider credits were unavailable', ...getClientInfoFn(req) });
+      return res.json({ response, tokens: 0, mode: 'local', providerUnavailable: true });
+    }
     res.status(500).json({ error: 'AI chat failed', details: error.message });
   }
 });
