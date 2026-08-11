@@ -14,6 +14,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const { sanitizeRelativeDirectory } = require('../utils/uploadPaths');
 const { ensureFileText } = require('../services/textExtraction');
+const { checkStorageCapacity, getStorageLimit, getStoredFileSize } = require('../services/storageQuota');
 
 // Helper to get user's Google tokens
 const getTokens = (user) => ({
@@ -81,7 +82,7 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/files/upload - Upload file(s) to Google Drive (or local storage if not connected)
+// POST /api/files/upload - Upload file(s) to private Supabase Storage
 router.post('/upload', authenticate, upload.array('files', 20), async (req, res) => {
   try {
     const { folderId, relativePath = '' } = req.body;
@@ -89,17 +90,8 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
       return res.status(400).json({ error: 'No files provided' });
     }
     const incomingSize = req.files.reduce((sum, item) => sum + item.size, 0);
-    if ((req.user.storageUsed || 0) + incomingSize > (req.user.storageLimit || 0)) {
-      return res.status(413).json({ error: 'Storage limit exceeded' });
-    }
-    const r2Limit = Number(process.env.SUPABASE_STORAGE_LIMIT_BYTES) || 900000000;
-    const stored = await File.find({ storageType: 'supabase' }).select('size versions.size').lean();
-    const r2Used = stored.reduce((sum, item) => sum + (item.versions?.length
-      ? item.versions.reduce((versionSum, version) => versionSum + (version.size || 0), 0)
-      : (item.size || 0)), 0);
-    if (r2Used + incomingSize > r2Limit) {
-      return res.status(413).json({ error: 'AirDrive cloud storage capacity exceeded' });
-    }
+    const capacity = await checkStorageCapacity(req.user, incomingSize);
+    if (!capacity.ok) return res.status(413).json({ error: capacity.error });
 
     storageService.assertConfigured();
     const io = req.app.get('io');
@@ -140,37 +132,40 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
       let webContentLink = '';
 
       r2Key = `${req.user._id}/${uuidv4()}${ext}`;
-      await storageService.uploadBuffer({
-        key: r2Key, buffer: file.buffer, mimeType: file.mimetype,
-        metadata: { originalname: encodeURIComponent(file.originalname) },
-      });
+      await storageService.uploadBuffer({ key: r2Key, buffer: file.buffer, mimeType: file.mimetype });
 
-      // Store metadata in MongoDB
-      const fileMeta = await File.create({
-        googleFileId,
-        r2Key,
-        storageType: 'supabase',
-        localPath,
-        userId: req.user._id,
-        folderId: destinationFolder?._id || null,
-        name: file.originalname,
-        originalName: file.originalname,
-        mimeType: file.mimetype,
-        extension: ext,
-        size: file.size,
-        thumbnail,
-        webViewLink,
-        webContentLink,
-        versions: [{
+      let fileMeta;
+      try {
+        // Store metadata in MongoDB. Remove the object if metadata creation fails.
+        fileMeta = await File.create({
           googleFileId,
           r2Key,
+          storageType: 'supabase',
           localPath,
-          versionNumber: 1,
+          userId: req.user._id,
+          folderId: destinationFolder?._id || null,
+          name: file.originalname,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          extension: ext,
           size: file.size,
-          uploadedAt: new Date(),
-          uploadedBy: req.user._id,
-        }],
-      });
+          thumbnail,
+          webViewLink,
+          webContentLink,
+          versions: [{
+            googleFileId,
+            r2Key,
+            localPath,
+            versionNumber: 1,
+            size: file.size,
+            uploadedAt: new Date(),
+            uploadedBy: req.user._id,
+          }],
+        });
+      } catch (error) {
+        await storageService.deleteObject(r2Key).catch(() => {});
+        throw error;
+      }
 
       // Update user storage
       await User.findByIdAndUpdate(req.user._id, { $inc: { storageUsed: file.size } });
@@ -250,7 +245,7 @@ router.get('/storage', authenticate, async (req, res) => {
     ]);
 
     let storageUsed = user.storageUsed || 0;
-    let storageLimit = Number(process.env.SUPABASE_STORAGE_LIMIT_BYTES) || 900000000;
+    let storageLimit = Math.min(user.storageLimit || getStorageLimit(), getStorageLimit());
     let driveUsed = null;
     let trashUsed = null;
 
@@ -331,7 +326,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       } else {
         await localService.deleteFile(file.localPath);
       }
-      await User.findByIdAndUpdate(req.user._id, { $inc: { storageUsed: -file.size } });
+      await User.findByIdAndUpdate(req.user._id, { $inc: { storageUsed: -getStoredFileSize(file) } });
       await File.deleteOne({ _id: file._id });
       await logActivity({ userId: req.user._id, action: 'delete', fileId: file._id, details: `Permanently deleted ${file.name}`, ...getClientInfo(req) });
       res.json({ message: 'File permanently deleted' });
@@ -383,6 +378,13 @@ router.post('/copy', authenticate, async (req, res) => {
     const { fileId, targetFolderId } = req.body;
     const file = await File.findOne({ _id: fileId, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
+    const capacity = await checkStorageCapacity(req.user, file.size);
+    if (!capacity.ok) return res.status(413).json({ error: capacity.error });
+
+    if (targetFolderId) {
+      const targetFolder = await Folder.findOne({ _id: targetFolderId, userId: req.user._id, trashed: false });
+      if (!targetFolder) return res.status(404).json({ error: 'Destination folder not found' });
+    }
 
     const copyName = `Copy of ${file.name}`;
     let googleFileId = '';
@@ -401,21 +403,28 @@ router.post('/copy', authenticate, async (req, res) => {
       localPath = copy.filePath;
     }
 
-    const newFile = await File.create({
-      ...file.toObject(),
-      _id: undefined,
-      googleFileId,
-      r2Key,
-      storageType: file.storageType,
-      localPath,
-      name: copyName,
-      folderId: targetFolderId || file.folderId,
-      starred: false,
-      pinned: false,
-      versions: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    let newFile;
+    try {
+      newFile = await File.create({
+        ...file.toObject(),
+        _id: undefined,
+        googleFileId,
+        r2Key,
+        storageType: file.storageType,
+        localPath,
+        name: copyName,
+        folderId: targetFolderId || file.folderId,
+        starred: false,
+        pinned: false,
+        versions: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      if (file.storageType === 'supabase' && r2Key) await storageService.deleteObject(r2Key).catch(() => {});
+      throw error;
+    }
+    await User.findByIdAndUpdate(req.user._id, { $inc: { storageUsed: file.size || 0 } });
 
     res.status(201).json({ file: newFile });
   } catch (error) {
@@ -466,8 +475,11 @@ router.post('/trash', authenticate, async (req, res) => {
 // POST /api/files/:id/version - Upload new version
 router.post('/:id/version', authenticate, upload.single('file'), async (req, res) => {
   try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
     const file = await File.findOne({ _id: req.params.id, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
+    const capacity = await checkStorageCapacity(req.user, req.file.size);
+    if (!capacity.ok) return res.status(413).json({ error: capacity.error });
 
     let googleFileId = '';
     let r2Key = '';
@@ -506,7 +518,13 @@ router.post('/:id/version', authenticate, upload.single('file'), async (req, res
     file.currentVersion = newVersion;
     file.size = req.file.size;
     file.updatedAt = new Date();
-    await file.save();
+    try {
+      await file.save();
+    } catch (error) {
+      if (file.storageType === 'supabase' && r2Key) await storageService.deleteObject(r2Key).catch(() => {});
+      throw error;
+    }
+    await User.findByIdAndUpdate(req.user._id, { $inc: { storageUsed: req.file.size || 0 } });
 
     await logActivity({ userId: req.user._id, action: 'version_upload', fileId: file._id, details: `Version ${newVersion}`, ...getClientInfo(req) });
     res.json({ file });

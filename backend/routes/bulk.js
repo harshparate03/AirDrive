@@ -7,6 +7,9 @@ const driveService = require('../services/googleDrive');
 const storageService = require('../services/supabaseStorage');
 const localService = require('../services/localStorage');
 const archiver = require('archiver');
+const User = require('../models/User');
+const Folder = require('../models/Folder');
+const { getStoredFileSize } = require('../services/storageQuota');
 
 const getTokens = (user) => ({
   accessToken: decrypt(user.googleAccessToken),
@@ -63,14 +66,30 @@ router.post('/delete', authenticate, async (req, res) => {
 
     if (permanent === true) {
       const { accessToken, refreshToken } = getTokens(req.user);
+      const deletedIds = [];
+      let removedSize = 0;
       for (const file of files) {
         try {
           if (file.storageType === 'supabase' && file.r2Key) await storageService.deleteFileObjects(file);
           else if (file.storageType === 'google' && file.googleFileId) await driveService.deleteFile(accessToken, refreshToken, file.googleFileId);
           else if (file.localPath) await localService.deleteFile(file.localPath);
-        } catch (_) {}
+          deletedIds.push(file._id);
+          removedSize += getStoredFileSize(file);
+        } catch (error) {
+          console.error(`Bulk delete failed for file ${file._id}:`, error.message);
+        }
       }
-      await File.deleteMany({ _id: { $in: fileIds }, userId: req.user._id });
+      if (deletedIds.length) {
+        await File.deleteMany({ _id: { $in: deletedIds }, userId: req.user._id });
+        await User.findByIdAndUpdate(req.user._id, { $inc: { storageUsed: -removedSize } });
+      }
+      if (deletedIds.length !== files.length) {
+        return res.status(502).json({
+          error: 'Some files could not be deleted from storage',
+          deleted: deletedIds.length,
+          failed: files.length - deletedIds.length,
+        });
+      }
     } else {
       await File.updateMany(
         { _id: { $in: fileIds }, userId: req.user._id },
@@ -89,6 +108,10 @@ router.post('/move', authenticate, async (req, res) => {
   try {
     const { fileIds, folderId } = req.body;
     if (!fileIds?.length) return res.status(400).json({ error: 'fileIds required' });
+    if (folderId) {
+      const folder = await Folder.findOne({ _id: folderId, userId: req.user._id, trashed: false });
+      if (!folder) return res.status(404).json({ error: 'Destination folder not found' });
+    }
 
     await File.updateMany(
       { _id: { $in: fileIds }, userId: req.user._id },

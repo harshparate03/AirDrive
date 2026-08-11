@@ -6,6 +6,7 @@ const FileRequest = require('../models/FileRequest');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
 const storageService = require('../services/supabaseStorage');
+const { checkStorageCapacity } = require('../services/storageQuota');
 const { v4: uuidv4 } = require('uuid');
 
 // POST /api/file-requests — create request
@@ -86,19 +87,8 @@ router.post('/:token/upload', upload.array('files', 20), async (req, res) => {
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
     storageService.assertConfigured();
     const incomingSize = req.files.reduce((sum, file) => sum + file.size, 0);
-    const [storedFiles, storedRequests] = await Promise.all([
-      require('../models/File').find({ storageType: 'supabase' }).select('size versions.size').lean(),
-      FileRequest.find({ 'uploads.r2Key': { $exists: true } }).select('uploads.size uploads.r2Key').lean(),
-    ]);
-    const filesUsed = storedFiles.reduce((sum, item) => sum + (item.versions?.length
-      ? item.versions.reduce((versionSum, version) => versionSum + (version.size || 0), 0)
-      : (item.size || 0)), 0);
-    const requestsUsed = storedRequests.reduce((sum, item) => sum + item.uploads
-      .filter(upload => upload.r2Key).reduce((uploadSum, upload) => uploadSum + (upload.size || 0), 0), 0);
-    const r2Limit = Number(process.env.SUPABASE_STORAGE_LIMIT_BYTES) || 900000000;
-    if (filesUsed + requestsUsed + incomingSize > r2Limit) {
-      return res.status(413).json({ error: 'AirDrive cloud storage capacity exceeded' });
-    }
+    const capacity = await checkStorageCapacity(owner, incomingSize);
+    if (!capacity.ok) return res.status(413).json({ error: capacity.error });
 
     const uploaded = [];
     try {

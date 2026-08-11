@@ -6,6 +6,7 @@ const Activity = require('../models/Activity');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
 const storageService = require('../services/supabaseStorage');
+const { getStorageLimit } = require('../services/storageQuota');
 
 // GET /api/users/profile
 router.get('/profile', authenticate, async (req, res) => {
@@ -13,7 +14,7 @@ router.get('/profile', authenticate, async (req, res) => {
     const user = await User.findById(req.user._id).select('-googleAccessToken -googleRefreshToken -refreshToken');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const storageInfo = { usage: user.storageUsed || 0, limit: Number(process.env.SUPABASE_STORAGE_LIMIT_BYTES) || 900000000, source: 'supabase' };
+    const storageInfo = { usage: user.storageUsed || 0, limit: Math.min(user.storageLimit || getStorageLimit(), getStorageLimit()), source: 'supabase' };
 
     res.json({ user, storageInfo });
   } catch (error) {
@@ -100,9 +101,11 @@ router.delete('/account', authenticate, async (req, res) => {
   try {
     const File = require('../models/File');
     const Folder = require('../models/Folder');
+    const FileRequest = require('../models/FileRequest');
 
-    const [files, account] = await Promise.all([
+    const [files, fileRequests, account] = await Promise.all([
       File.find({ userId: req.user._id }),
+      FileRequest.find({ userId: req.user._id }).select('uploads.r2Key').lean(),
       User.findById(req.user._id),
     ]);
     const accessToken = account?.googleAccessToken ? decrypt(account.googleAccessToken) : '';
@@ -116,6 +119,8 @@ router.delete('/account', authenticate, async (req, res) => {
         await require('../services/localStorage').deleteFile(file.localPath);
       }
     }
+    const requestObjectKeys = fileRequests.flatMap(request => (request.uploads || []).map(upload => upload.r2Key)).filter(Boolean);
+    await storageService.deleteObjects(requestObjectKeys);
 
     const fileIds = files.map(file => file._id);
     const folders = await Folder.find({ userId: req.user._id });
@@ -130,7 +135,7 @@ router.delete('/account', authenticate, async (req, res) => {
       Activity.deleteMany({ userId: req.user._id }),
       require('../models/Notification').deleteMany({ userId: req.user._id }),
       require('../models/SharedLink').deleteMany({ userId: req.user._id }),
-      require('../models/FileRequest').deleteMany({ userId: req.user._id }),
+      FileRequest.deleteMany({ userId: req.user._id }),
       require('../models/AIHistory').deleteMany({ userId: req.user._id }),
       require('../models/Comment').deleteMany({ $or: [{ userId: req.user._id }, { fileId: { $in: fileIds } }] }),
       User.findByIdAndDelete(req.user._id),

@@ -1,6 +1,6 @@
 const multer = require('multer');
 
-// Use memory storage - files go straight to Google Drive
+// Use memory storage before sending files to private Supabase Storage.
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
@@ -12,7 +12,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: (parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) || 100) * 1024 * 1024,
+    fileSize: (parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) || 50) * 1024 * 1024,
     files: 20, // max 20 files at once
   },
 });
