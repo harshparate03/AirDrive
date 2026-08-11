@@ -37,9 +37,14 @@ const UploadModal = () => {
     if (!selectedFiles.length) return
     setBatchStartIndex(uploadQueue.length)
     setUploading(true)
-    await upload(selectedFiles)
+    const uploadedFiles = await upload(selectedFiles)
     setUploading(false)
     setDone(true)
+    if (modalData?.selectForAI && uploadedFiles?.length) {
+      window.dispatchEvent(new CustomEvent('airdrive:ai-context-uploaded', {
+        detail: { file: uploadedFiles[0], count: uploadedFiles.length },
+      }))
+    }
     setTimeout(() => dispatch(closeModal()), 1200)
   }
 
