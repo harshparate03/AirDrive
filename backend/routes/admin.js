@@ -403,7 +403,7 @@ router.get('/health', async (req, res) => {
       { name: 'Database', status: databaseConnected ? 'operational' : 'degraded', detail: databaseConnected ? 'MongoDB connected' : 'MongoDB disconnected' },
       { name: 'Authentication', status: process.env.JWT_SECRET ? 'operational' : 'degraded', detail: process.env.JWT_SECRET ? 'JWT configured' : 'JWT configuration missing' },
       { name: 'Email', status: (process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL && process.env.GOOGLE_APPS_SCRIPT_EMAIL_SECRET) || process.env.BREVO_API_KEY || ((process.env.GMAIL_USER || process.env.EMAIL_USER) && (process.env.GMAIL_APP_PASSWORD || process.env.EMAIL_PASS)) ? 'operational' : 'not_configured', detail: process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL ? 'Google Apps Script HTTPS relay' : process.env.BREVO_API_KEY ? 'Brevo HTTPS email API' : 'SMTP configuration' },
-      { name: 'AI', status: process.env.OPENAI_API_KEY ? 'operational' : 'not_configured', detail: 'AI provider configuration' },
+      { name: 'AI', status: (process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY) ? 'operational' : 'not_configured', detail: process.env.GROQ_API_KEY ? 'Groq provider configuration' : 'OpenAI provider configuration' },
       {
         name: 'Storage',
         status: process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_STORAGE_BUCKET ? 'operational' : 'degraded',

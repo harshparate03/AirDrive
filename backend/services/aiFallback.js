@@ -1,14 +1,26 @@
 const path = require('path');
 
-const PLACEHOLDER_KEYS = new Set(['', 'sk-your-openai-api-key', 'your-openai-api-key']);
+const PLACEHOLDER_KEYS = new Set(['', 'sk-your-openai-api-key', 'your-openai-api-key', 'gsk_your-groq-api-key', 'your-groq-api-key']);
 const STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'from', 'this', 'that', 'file', 'document', 'copy', 'final']);
 
 const isAIConfigured = () => {
-  const key = (process.env.OPENAI_API_KEY || '').trim();
+  const key = getAIKey();
   return Boolean(key) && !PLACEHOLDER_KEYS.has(key.toLowerCase());
 };
 
-const getAIModel = () => process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const getAIProvider = () => {
+  if ((process.env.GROQ_API_KEY || '').trim()) return 'groq';
+  if ((process.env.OPENAI_API_KEY || '').trim()) return 'openai';
+  return 'local';
+};
+
+const getAIKey = () => (getAIProvider() === 'groq' ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY || '').trim();
+const getAIBaseURL = () => getAIProvider() === 'groq'
+  ? 'https://api.groq.com/openai/v1'
+  : process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+const getAIModel = () => getAIProvider() === 'groq'
+  ? process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
+  : process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 const cleanWords = value => String(value || '').toLowerCase()
   .replace(/\.[a-z0-9]{1,8}$/i, '')
@@ -67,6 +79,9 @@ const answerLocally = ({ message, file, content }) => {
 
 module.exports = {
   isAIConfigured,
+  getAIProvider,
+  getAIKey,
+  getAIBaseURL,
   getAIModel,
   generateLocalTags,
   summarizeLocally,

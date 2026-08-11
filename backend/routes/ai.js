@@ -9,13 +9,13 @@ const driveService = require('../services/googleDrive');
 const { ensureFileText } = require('../services/textExtraction');
 const OpenAI = require('openai');
 const {
-  isAIConfigured, getAIModel, generateLocalTags, summarizeLocally,
+  isAIConfigured, getAIProvider, getAIKey, getAIBaseURL, getAIModel, generateLocalTags, summarizeLocally,
   suggestLocalName, suggestFoldersLocally, answerLocally,
 } = require('../services/aiFallback');
 
 const getOpenAI = () => new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY.trim(),
-  baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+  apiKey: getAIKey(),
+  baseURL: getAIBaseURL(),
 });
 
 const getTokens = (user) => ({
@@ -28,6 +28,7 @@ router.get('/status', authenticate, (req, res) => {
   res.json({
     configured: isAIConfigured(),
     mode: isAIConfigured() ? 'provider' : 'local',
+    provider: isAIConfigured() ? getAIProvider() : 'local',
     model: isAIConfigured() ? getAIModel() : 'local-fallback',
   });
 });
