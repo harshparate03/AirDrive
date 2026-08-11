@@ -109,18 +109,20 @@ router.post('/chat', authenticate, async (req, res) => {
 // POST /api/ai/summary - Summarize file
 router.post('/summary', authenticate, async (req, res) => {
   const start = Date.now();
+  const { fileId, type = 'summary' } = req.body;
+  let content = '';
+  let file = null;
   try {
-    const { fileId, type = 'summary' } = req.body;
-    const file = await File.findOne({ _id: fileId, userId: req.user._id });
+    file = await File.findOne({ _id: fileId, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     const extractedText = await ensureFileText(file, req.user).catch(() => '');
-    const content = extractedText || `File: ${file.name}\nType: ${file.mimeType}`;
+    content = extractedText || `File: ${file.name}\nType: ${file.mimeType}`;
     const prompts = {
-      summary: `Summarize the following content concisely:\n\n${content.substring(0, 8000)}`,
-      explain: `Explain the following content in simple terms:\n\n${content.substring(0, 8000)}`,
-      important: `Extract the most important points from:\n\n${content.substring(0, 8000)}`,
-      notes: `Generate structured study notes from:\n\n${content.substring(0, 8000)}`,
+      summary: `Create a clear document summary with the headings "Overview" and "Main ideas". Use short paragraphs and bullet points.\n\n${content.substring(0, 8000)}`,
+      explain: `Explain this document in simple language. Use the headings "Simple explanation", "What it means", and "Example" where relevant.\n\n${content.substring(0, 8000)}`,
+      important: `Extract the most important points. Start with a one-sentence takeaway, then provide a concise bullet list under "Key points".\n\n${content.substring(0, 8000)}`,
+      notes: `Create structured study notes with headings, bullet points, important terms, and a short review section.\n\n${content.substring(0, 8000)}`,
     };
 
     if (!isAIConfigured()) {
@@ -163,6 +165,13 @@ router.post('/summary', authenticate, async (req, res) => {
     res.json({ response, type, tokens });
   } catch (error) {
     console.error('AI summary error:', error.message);
+    const providerUnavailable = error.status === 429 || error.code === 'insufficient_quota' || /no credits|quota|rate limit/i.test(error.message || '');
+    if (providerUnavailable && file) {
+      const response = summarizeLocally(content || `${file.name} (${file.mimeType})`, type);
+      await AIHistory.create({ userId: req.user._id, fileId, type: 'summary', prompt: type, response, model: 'local-fallback', duration: Date.now() - start });
+      await logActivityFn({ userId: req.user._id, action: 'ai_summary', fileId, details: `Generated local ${type} because provider was unavailable`, ...getClientInfoFn(req) });
+      return res.json({ response, type, tokens: 0, mode: 'local', providerUnavailable: true });
+    }
     res.status(500).json({ error: 'AI summary failed', details: error.message });
   }
 });

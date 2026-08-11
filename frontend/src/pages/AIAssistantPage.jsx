@@ -23,6 +23,17 @@ const AI_FEATURES = [
 
 const showApiError = (error, fallback) => toast.error(error.response?.data?.details || error.response?.data?.error || fallback)
 
+const StructuredAIText = ({ content }) => {
+  const lines = String(content || '').split('\n').map(line => line.trim()).filter(Boolean)
+  return <div className="space-y-2 text-sm leading-6 text-dark-600 dark:text-dark-200">{lines.map((line, index) => {
+    const clean = line.replace(/^#{1,6}\s*/, '').replace(/^\*\*(.*?)\*\*:?$/, '$1')
+    if (/^#{1,6}\s/.test(line) || /^\*\*.*\*\*:?$/.test(line)) return <h3 key={index} className="pt-2 text-base font-semibold text-dark-800 dark:text-white">{clean}</h3>
+    if (/^[-*â€¢]\s+/.test(line)) return <div key={index} className="flex gap-2 pl-2"><span className="text-primary-500">•</span><span>{line.replace(/^[-*â€¢]\s+/, '')}</span></div>
+    if (/^\d+[.)]\s+/.test(line)) return <div key={index} className="flex gap-2 pl-2"><span className="font-semibold text-primary-500">{line.match(/^\d+[.)]/)?.[0]}</span><span>{line.replace(/^\d+[.)]\s+/, '')}</span></div>
+    return <p key={index}>{line}</p>
+  })}</div>
+}
+
 const Message = ({ msg }) => (
   <motion.div
     initial={{ opacity: 0, y: 10 }}
@@ -39,7 +50,7 @@ const Message = ({ msg }) => (
         ? 'bg-primary-600 text-white rounded-br-sm'
         : 'bg-white dark:bg-dark-800 text-dark-700 dark:text-dark-200 border border-slate-100 dark:border-dark-700 rounded-bl-sm'
     }`}>
-      {msg.content}
+      {msg.role === 'assistant' ? <StructuredAIText content={msg.content} /> : msg.content}
     </div>
   </motion.div>
 )
@@ -116,7 +127,7 @@ const AIAssistantPage = () => {
 
   const summaryMutation = useMutation({
     mutationFn: ({ fileId, type }) => api.post('/ai/summary', { fileId, type }),
-    onError: (error) => toast.error(error.response?.data?.error || 'Document summary failed'),
+    onError: (error) => showApiError(error, 'Document summary failed'),
   })
 
   const applyRenameMutation = useMutation({
@@ -396,7 +407,7 @@ const AIAssistantPage = () => {
             <ContextFileCard
               files={filesData?.files || []}
               selectedFile={selectedFile}
-              onSelect={setSelectedFile}
+              onSelect={(file) => { setSelectedFile(file); summaryMutation.reset() }}
               onUpload={() => dispatch(openModal({ modal: 'upload', data: { selectForAI: true, aiFeature: 'summary' } }))}
               title="Document to summarize"
             />
@@ -404,7 +415,7 @@ const AIAssistantPage = () => {
               {[
                 ['summary', 'Summary'], ['important', 'Key points'], ['explain', 'Explain simply'], ['notes', 'Study notes'],
               ].map(([value, label]) => (
-                <button key={value} onClick={() => setSummaryType(value)} className={summaryType === value ? 'btn-primary text-sm' : 'btn-secondary text-sm'}>{label}</button>
+                <button key={value} onClick={() => { setSummaryType(value); summaryMutation.reset() }} className={`${summaryType === value ? 'border-primary-500 bg-primary-600 text-white shadow-sm' : 'border-slate-200 bg-white text-dark-600 hover:border-primary-300 hover:bg-primary-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700'} rounded-xl border px-3 py-3 text-sm font-medium transition`}>{label}</button>
               ))}
             </div>
             <button
@@ -418,7 +429,7 @@ const AIAssistantPage = () => {
             {summaryMutation.data && (
               <div className="rounded-xl border border-slate-200 dark:border-dark-700 bg-slate-50 dark:bg-dark-800 p-4 sm:p-5">
                 <h3 className="font-semibold text-dark-800 dark:text-white mb-3">Result</h3>
-                <div className="whitespace-pre-wrap text-sm leading-6 text-dark-600 dark:text-dark-200">{summaryMutation.data.data.response}</div>
+                <StructuredAIText content={summaryMutation.data.data.response} />
               </div>
             )}
           </div>
