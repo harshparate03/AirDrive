@@ -4,6 +4,7 @@ const { sanitizeRelativeDirectory } = require('../utils/uploadPaths');
 const { encrypt, decrypt, hashPassword } = require('../utils/encryption');
 const SharedLink = require('../models/SharedLink');
 const { getStoredFileSize, getStorageLimit } = require('../services/storageQuota');
+const { generateLocalTags, summarizeLocally, suggestLocalName, suggestFoldersLocally } = require('../services/aiFallback');
 
 test('folder upload paths preserve safe nesting and remove traversal', () => {
   assert.deepEqual(sanitizeRelativeDirectory('Project/../Reports/Q1?.pdf'), ['Project', 'Reports']);
@@ -40,4 +41,12 @@ test('Supabase storage limit uses a safe default and valid override', () => {
   assert.equal(getStorageLimit(), 900000000);
   if (original === undefined) delete process.env.SUPABASE_STORAGE_LIMIT_BYTES;
   else process.env.SUPABASE_STORAGE_LIMIT_BYTES = original;
+});
+
+test('AI local fallbacks produce usable document tools without a provider key', () => {
+  const file = { name: 'Quarterly Sales Report.pdf', category: 'pdf', mimeType: 'application/pdf', ocrText: 'Revenue increased this quarter. Expenses remained stable.' };
+  assert.ok(generateLocalTags(file).includes('sales'));
+  assert.match(summarizeLocally(file.ocrText, 'important'), /Revenue increased/);
+  assert.match(suggestLocalName(file), /\.pdf$/i);
+  assert.deepEqual(suggestFoldersLocally([file])[0].folder, 'PDF Documents');
 });

@@ -3,8 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   HiSparkles, HiPaperAirplane, HiDocument, HiTag, HiSearch,
-  HiDuplicate, HiFolder, HiLightningBolt,
+  HiDuplicate, HiFolder, HiLightningBolt, HiUpload, HiCheckCircle,
 } from 'react-icons/hi'
+import { useDispatch } from 'react-redux'
+import { openModal } from '../store/slices/uiSlice'
 import api from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -17,6 +19,8 @@ const AI_FEATURES = [
   { id: 'duplicates', icon: HiDuplicate, label: 'Find Duplicates', desc: 'Detect similar or duplicate files' },
   { id: 'folders', icon: HiFolder, label: 'Folder Suggestions', desc: 'AI recommends how to organize files' },
 ]
+
+const showApiError = (error, fallback) => toast.error(error.response?.data?.details || error.response?.data?.error || fallback)
 
 const Message = ({ msg }) => (
   <motion.div
@@ -40,6 +44,7 @@ const Message = ({ msg }) => (
 )
 
 const AIAssistantPage = () => {
+  const dispatch = useDispatch()
   const queryClient = useQueryClient()
   const [activeFeature, setActiveFeature] = useState('chat')
   const [messages, setMessages] = useState([
@@ -58,12 +63,17 @@ const AIAssistantPage = () => {
     queryFn: () => api.get('/files').then(r => r.data),
   })
 
+  const { data: aiStatus } = useQuery({
+    queryKey: ['ai-status'],
+    queryFn: () => api.get('/ai/status').then(r => r.data),
+  })
+
   const chatMutation = useMutation({
     mutationFn: (data) => api.post('/ai/chat', data),
     onSuccess: (res) => {
       setMessages(prev => [...prev, { role: 'assistant', content: res.data.response }])
     },
-    onError: () => toast.error('AI chat failed. Check your API key.'),
+    onError: (error) => showApiError(error, 'AI chat failed'),
   })
 
   const tagsMutation = useMutation({
@@ -73,7 +83,7 @@ const AIAssistantPage = () => {
       queryClient.invalidateQueries({ queryKey: ['files-for-ai'] })
       toast.success(`Generated ${res.data.tags.length} tags`)
     },
-    onError: () => toast.error('Tag generation failed'),
+    onError: (error) => showApiError(error, 'Tag generation failed'),
   })
 
   const summaryMutation = useMutation({
@@ -88,7 +98,7 @@ const AIAssistantPage = () => {
       queryClient.invalidateQueries({ queryKey: ['files-for-ai'] })
       toast.success('File renamed')
     },
-    onError: () => toast.error('Could not apply the suggested name'),
+    onError: (error) => showApiError(error, 'Could not apply the suggested name'),
   })
 
   const renameMutation = useMutation({
@@ -96,7 +106,7 @@ const AIAssistantPage = () => {
     onSuccess: (res) => {
       toast.success(`Suggested name: ${res.data.suggestedName}`)
     },
-    onError: () => toast.error('Rename suggestion failed'),
+    onError: (error) => showApiError(error, 'Rename suggestion failed'),
   })
 
   const duplicatesMutation = useMutation({
@@ -105,19 +115,19 @@ const AIAssistantPage = () => {
       const total = res.data.exactDuplicates.length + res.data.similarNames.length
       toast.success(`Found ${total} potential duplicates`)
     },
-    onError: () => toast.error('Duplicate detection failed'),
+    onError: (error) => showApiError(error, 'Duplicate detection failed'),
   })
 
   const smartSearchMutation = useMutation({
     mutationFn: (query) => api.post('/ai/smart-search', { query }),
     onSuccess: (res) => setSmartResults(res.data.files),
-    onError: () => toast.error('Smart search failed'),
+    onError: (error) => showApiError(error, 'Smart search failed'),
   })
 
   const folderMutation = useMutation({
     mutationFn: (fileIds) => api.post('/ai/folder-suggestion', { fileIds }),
     onSuccess: (res) => setFolderSuggestions(res.data.suggestions || []),
-    onError: () => toast.error('Folder suggestion failed'),
+    onError: (error) => showApiError(error, 'Folder suggestion failed'),
   })
 
   useEffect(() => {
@@ -187,6 +197,17 @@ const AIAssistantPage = () => {
               <option key={f._id} value={f._id}>{f.name.substring(0, 40)}</option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => dispatch(openModal({ modal: 'upload' }))}
+            className="btn-secondary mt-2 flex w-full items-center justify-center gap-2 text-xs"
+          >
+            <HiUpload /> Upload a context file
+          </button>
+          <div className={`mt-3 rounded-xl border px-3 py-2 text-xs ${aiStatus?.configured ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300'}`}>
+            <p className="font-semibold">{aiStatus?.configured ? 'AI provider connected' : 'Local fallback mode'}</p>
+            <p className="mt-0.5 opacity-80">{aiStatus?.configured ? `Model: ${aiStatus.model}` : 'Core document tools work locally. Add a valid API key for full chat intelligence.'}</p>
+          </div>
         </div>
       </div>
 
@@ -203,6 +224,9 @@ const AIAssistantPage = () => {
             </h2>
             {selectedFile && <p className="text-xs text-dark-400">Analyzing: {selectedFile.name}</p>}
           </div>
+          <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold ${aiStatus?.configured ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>
+            {aiStatus?.configured ? 'AI online' : 'Local mode'}
+          </span>
         </div>
 
         {/* Chat view */}
@@ -266,7 +290,7 @@ const AIAssistantPage = () => {
                 <HiSearch />
               </button>
             </div>
-            {smartSearchMutation.isPending && <div className="text-center text-dark-400 py-8">Searching with AI...</div>}
+            {smartSearchMutation.isPending && <div className="text-center text-dark-400 py-8">Searching files...</div>}
             {smartResults && (
               <div className="space-y-2">
                 <p className="text-sm text-dark-500">{smartResults.length} results found</p>
@@ -359,21 +383,28 @@ const AIAssistantPage = () => {
               </div>
             )}
             {activeFeature === 'duplicates' && (
-              <div className="space-y-3">
-                <p className="text-sm text-dark-600 dark:text-dark-300">Scan your drive for duplicate or similar files.</p>
-                <button
-                  onClick={() => duplicatesMutation.mutate()}
-                  disabled={duplicatesMutation.isPending}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <HiDuplicate /> {duplicatesMutation.isPending ? 'Scanning...' : 'Find Duplicates'}
-                </button>
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 dark:border-dark-700 dark:from-dark-800 dark:to-dark-900 sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="flex items-center gap-2 font-semibold text-dark-800 dark:text-white"><HiDuplicate className="text-primary-500" /> Duplicate scanner</h3>
+                      <p className="mt-1 text-sm text-dark-500 dark:text-dark-400">Compares file size, type, and normalized names across your drive.</p>
+                    </div>
+                    <button onClick={() => duplicatesMutation.mutate()} disabled={duplicatesMutation.isPending} className="btn-primary flex min-w-max items-center justify-center gap-2">
+                      <HiDuplicate /> {duplicatesMutation.isPending ? 'Scanning drive...' : 'Scan all files'}
+                    </button>
+                  </div>
+                </div>
                 {duplicatesMutation.data && (
-                  <div className="space-y-3 pt-3">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-red-100 bg-red-50 p-3 dark:border-red-900/40 dark:bg-red-900/10"><p className="text-2xl font-bold text-red-600">{duplicatesMutation.data.data.exactDuplicates.length}</p><p className="text-xs text-red-500">Exact-size groups</p></div>
+                      <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 dark:border-amber-900/40 dark:bg-amber-900/10"><p className="text-2xl font-bold text-amber-600">{duplicatesMutation.data.data.similarNames.length}</p><p className="text-xs text-amber-600">Similar-name pairs</p></div>
+                    </div>
                     {duplicatesMutation.data.data.exactDuplicates.map((group, index) => (
-                      <div key={`exact-${index}`} className="rounded-xl bg-slate-50 dark:bg-dark-800 p-3">
-                        <p className="text-xs font-semibold text-red-500">Exact-size match</p>
-                        {group.map(file => <p key={file._id} className="mt-1 text-sm text-dark-700 dark:text-dark-200">{file.name}</p>)}
+                      <div key={`exact-${index}`} className="overflow-hidden rounded-xl border border-slate-200 dark:border-dark-700">
+                        <div className="flex items-center justify-between bg-red-50 px-3 py-2 dark:bg-red-900/10"><p className="text-xs font-semibold text-red-600">Exact match group {index + 1}</p><span className="text-xs text-dark-400">{group.length} files</span></div>
+                        <div className="divide-y divide-slate-100 dark:divide-dark-700">{group.map(file => <div key={file._id} className="flex items-center gap-3 px-3 py-2.5"><HiDocument className="text-dark-400" /><span className="min-w-0 flex-1 truncate text-sm text-dark-700 dark:text-dark-200">{file.name}</span><span className="text-xs text-dark-400">{file.mimeType?.split('/').pop()}</span></div>)}</div>
                       </div>
                     ))}
                     {duplicatesMutation.data.data.similarNames.map((group, index) => (
@@ -381,31 +412,31 @@ const AIAssistantPage = () => {
                         {group.map(file => file.name).join(' ↔ ')}
                       </div>
                     ))}
-                    {duplicatesMutation.data.data.exactDuplicates.length === 0 && duplicatesMutation.data.data.similarNames.length === 0 && <p className="text-sm text-green-600">No duplicates found.</p>}
+                    {duplicatesMutation.data.data.exactDuplicates.length === 0 && duplicatesMutation.data.data.similarNames.length === 0 && <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300"><HiCheckCircle className="text-2xl" /><div><p className="font-semibold">Your drive looks clean</p><p className="text-xs opacity-80">No duplicate groups were detected.</p></div></div>}
                   </div>
                 )}
               </div>
             )}
             {activeFeature === 'folders' && (
-              <div className="space-y-3">
-                <p className="text-sm text-dark-600 dark:text-dark-300">AI will analyze your files and suggest a better folder structure.</p>
-                <button
-                  onClick={() => {
-                    const ids = filesData?.files?.slice(0, 20).map(f => f._id) || []
-                    folderMutation.mutate(ids)
-                  }}
-                  disabled={folderMutation.isPending}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <HiFolder /> Generate Folder Suggestions
-                </button>
-                {folderSuggestions.map((suggestion, index) => (
-                  <div key={`${suggestion.folder}-${index}`} className="rounded-xl border border-slate-200 dark:border-dark-700 p-4">
-                    <p className="font-semibold text-dark-800 dark:text-white">{suggestion.folder}</p>
-                    <p className="mt-1 text-xs text-dark-400">{suggestion.reason}</p>
-                    <p className="mt-2 text-sm text-dark-600 dark:text-dark-300">{suggestion.files?.join(', ')}</p>
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-4 dark:border-primary-900/40 dark:bg-primary-900/10 sm:p-5">
+                  <h3 className="flex items-center gap-2 font-semibold text-dark-800 dark:text-white"><HiFolder className="text-amber-500" /> Folder organization plan</h3>
+                  <p className="mt-1 text-sm text-dark-500 dark:text-dark-400">Analyze up to 20 visible files and group them into a cleaner structure. Suggestions do not move files automatically.</p>
+                  <button
+                    onClick={() => folderMutation.mutate(filesData?.files?.slice(0, 20).map(f => f._id) || [])}
+                    disabled={folderMutation.isPending || !filesData?.files?.length}
+                    className="btn-primary mt-4 flex items-center gap-2"
+                  >
+                    <HiFolder /> {folderMutation.isPending ? 'Building suggestions...' : `Analyze ${Math.min(filesData?.files?.length || 0, 20)} files`}
+                  </button>
+                  {!filesData?.files?.length && <p className="mt-2 text-xs text-amber-600">Upload at least one file to generate suggestions.</p>}
+                </div>
+                {folderSuggestions.length > 0 && <div className="grid gap-3 sm:grid-cols-2">{folderSuggestions.map((suggestion, index) => (
+                  <div key={`${suggestion.folder}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-800">
+                    <div className="flex items-start gap-3"><div className="rounded-lg bg-amber-100 p-2 text-amber-600 dark:bg-amber-900/30"><HiFolder /></div><div className="min-w-0"><p className="font-semibold text-dark-800 dark:text-white">{suggestion.folder}</p><p className="mt-1 text-xs leading-5 text-dark-400">{suggestion.reason}</p></div></div>
+                    <div className="mt-3 flex flex-wrap gap-1.5">{suggestion.files?.map(name => <span key={name} className="max-w-full truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs text-dark-600 dark:bg-dark-700 dark:text-dark-300" title={name}>{name}</span>)}</div>
                   </div>
-                ))}
+                ))}</div>}
               </div>
             )}
           </div>

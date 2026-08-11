@@ -8,6 +8,7 @@ const activitySchema = new mongoose.Schema({
       'upload', 'download', 'delete', 'restore', 'share', 'view',
       'rename', 'move', 'copy', 'star', 'unstar', 'trash', 'login',
       'logout', 'create_folder', 'delete_folder', 'ai_tag', 'ai_rename',
+      'ai_chat', 'ai_summary', 'ai_search', 'ai_folder_suggestion', 'duplicate_scan',
       'ocr', 'comment', 'permission_change', 'version_upload', 'version_restore',
     ],
     required: true,

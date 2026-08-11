@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
-import { HiUser, HiMoon, HiSun, HiShieldCheck, HiTrash, HiBell, HiLockClosed, HiEye, HiEyeOff, HiCloud } from 'react-icons/hi'
+import { HiUser, HiMoon, HiSun, HiShieldCheck, HiTrash, HiBell, HiLockClosed, HiEye, HiEyeOff, HiCloud, HiRefresh, HiClock } from 'react-icons/hi'
 import { updateProfile, changePassword } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
 import toast from 'react-hot-toast'
@@ -50,7 +50,7 @@ const SettingsPage = () => {
     setChangingPassword(false)
   }
 
-  const { data: activityData } = useQuery({
+  const { data: activityData, isLoading: activityLoading, isError: activityError, refetch: refetchActivity } = useQuery({
     queryKey: ['activities'],
     queryFn: () => api.get('/activities').then(r => r.data),
   })
@@ -281,7 +281,13 @@ const SettingsPage = () => {
 
           {activeSection === 'activity' && (
             <div className="space-y-5">
-              <h2 className="text-base font-semibold text-dark-800 dark:text-dark-100">Activity Log</h2>
+              <div className="flex items-center justify-between gap-3">
+                <div><h2 className="text-base font-semibold text-dark-800 dark:text-dark-100">Activity Log</h2><p className="mt-0.5 text-xs text-dark-400">Uploads, downloads, organization changes, and AI actions.</p></div>
+                <button onClick={() => refetchActivity()} className="btn-secondary flex items-center gap-1.5 text-xs"><HiRefresh /> Refresh</button>
+              </div>
+
+              {activityLoading && <div className="rounded-xl bg-slate-50 p-6 text-center text-sm text-dark-400 dark:bg-dark-800">Loading activity...</div>}
+              {activityError && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-900/10">Activity could not be loaded. Check your connection and try Refresh.</div>}
 
               {/* Heatmap */}
               {activityData?.heatmap?.length > 0 && (
@@ -305,6 +311,7 @@ const SettingsPage = () => {
                     </span>
                   </div>
                 ))}
+                {!activityLoading && !activityError && activityData?.activities?.length === 0 && <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 py-10 text-center dark:border-dark-700"><HiClock className="mb-2 text-3xl text-dark-300" /><p className="text-sm font-medium text-dark-600 dark:text-dark-300">No activity recorded yet</p><p className="mt-1 text-xs text-dark-400">Upload, view, rename, or organize a file to create your first entry.</p></div>}
               </div>
             </div>
           )}
