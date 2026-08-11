@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema({
 
   // Storage tracking
   storageUsed: { type: Number, default: 0 },
-  storageLimit: { type: Number, default: 15 * 1024 * 1024 * 1024 }, // 15 GB
+  storageLimit: { type: Number, default: 900000000 }, // Per-user cap; global Supabase cap is enforced separately.
 
   // Email verification
   isEmailVerified: { type: Boolean, default: false },

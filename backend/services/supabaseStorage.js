@@ -46,11 +46,17 @@ const deleteObject = async key => {
   throwIfError(error);
 };
 
+const deleteObjects = async keys => {
+  const uniqueKeys = [...new Set((keys || []).filter(Boolean))];
+  for (let index = 0; index < uniqueKeys.length; index += 100) {
+    const { error } = await bucket().remove(uniqueKeys.slice(index, index + 100));
+    throwIfError(error);
+  }
+};
+
 const deleteFileObjects = async file => {
   const keys = [...new Set([file.r2Key, ...(file.versions || []).map(version => version.r2Key)].filter(Boolean))];
-  if (!keys.length) return;
-  const { error } = await bucket().remove(keys);
-  throwIfError(error);
+  await deleteObjects(keys);
 };
 
 const copyObject = async (sourceKey, destinationKey) => {
@@ -68,4 +74,4 @@ const exists = async key => {
   return data.some(item => item.name === name);
 };
 
-module.exports = { assertConfigured, uploadBuffer, getStream, getBuffer, deleteObject, deleteFileObjects, copyObject, exists };
+module.exports = { assertConfigured, uploadBuffer, getStream, getBuffer, deleteObject, deleteObjects, deleteFileObjects, copyObject, exists };

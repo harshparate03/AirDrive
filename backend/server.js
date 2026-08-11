@@ -121,9 +121,11 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
-  const statusCode = err.statusCode || err.status || 500;
+  const uploadStatus = err.code === 'LIMIT_FILE_SIZE' ? 413
+    : err.code?.startsWith('LIMIT_') ? 400 : null;
+  const statusCode = uploadStatus || err.statusCode || err.status || 500;
   res.status(statusCode).json({
-    error: err.message || 'Internal Server Error',
+    error: err.code === 'LIMIT_FILE_SIZE' ? 'File exceeds the maximum upload size' : (err.message || 'Internal Server Error'),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 });

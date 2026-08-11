@@ -7,6 +7,7 @@ const { logActivity, getClientInfo } = require('../utils/activityLogger');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
 const storageService = require('../services/supabaseStorage');
+const { getStoredFileSize } = require('../services/storageQuota');
 
 const getTokens = (user) => ({
   accessToken: decrypt(user.googleAccessToken),
@@ -109,7 +110,7 @@ router.delete('/:id', authenticate, async (req, res) => {
           await require('../services/localStorage').deleteFile(file.localPath);
         }
       }
-      const removedSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
+      const removedSize = files.reduce((sum, file) => sum + getStoredFileSize(file), 0);
       await File.deleteMany({ _id: { $in: files.map(file => file._id) } });
       await Folder.deleteMany({ _id: { $in: folderIds }, userId: req.user._id });
       if (removedSize) await require('../models/User').findByIdAndUpdate(req.user._id, { $inc: { storageUsed: -removedSize } });

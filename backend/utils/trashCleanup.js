@@ -5,6 +5,7 @@ const { decrypt } = require('./encryption');
 const driveService = require('../services/googleDrive');
 const localService = require('../services/localStorage');
 const storageService = require('../services/supabaseStorage');
+const { getStoredFileSize } = require('../services/storageQuota');
 
 const cleanupExpiredTrash = async () => {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -21,7 +22,7 @@ const cleanupExpiredTrash = async () => {
       } else if (file.localPath) {
         await localService.deleteFile(file.localPath);
       }
-      await User.findByIdAndUpdate(file.userId, { $inc: { storageUsed: -(file.size || 0) } });
+      await User.findByIdAndUpdate(file.userId, { $inc: { storageUsed: -getStoredFileSize(file) } });
       await file.deleteOne();
     } catch (error) {
       console.error(`Trash cleanup failed for file ${file._id}:`, error.message);
