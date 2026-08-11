@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const versionSchema = new mongoose.Schema({
   googleFileId: { type: String, default: '' },
+  r2Key: { type: String, default: '' },
   localPath: { type: String, default: '' },
   versionNumber: { type: Number, required: true },
   size: { type: Number, default: 0 },
@@ -12,7 +13,8 @@ const versionSchema = new mongoose.Schema({
 
 const fileSchema = new mongoose.Schema({
   googleFileId: { type: String, default: '' },
-  storageType: { type: String, enum: ['google', 'local'], default: 'local' },
+  r2Key: { type: String, default: '' },
+  storageType: { type: String, enum: ['supabase', 'r2', 'google', 'local'], default: 'supabase' },
   localPath: { type: String, default: '' },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   folderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Folder', default: null },

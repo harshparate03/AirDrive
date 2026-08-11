@@ -1,13 +1,13 @@
 # Air Drive — AI Powered Cloud Storage
 
-A full-stack cloud storage platform using **Google Drive API** for file storage, **OpenAI** for AI features, and a modern glassmorphic UI.
+A full-stack cloud storage platform using private **Supabase Storage**, **OpenAI** for AI features, and a modern glassmorphic UI.
 
 ## Quick Start
 
 ### Prerequisites
 - Node.js 18+
 - MongoDB Atlas account
-- Google Cloud project with Drive API + OAuth 2.0 enabled
+- Supabase project with a private Storage bucket and secret API key
 - OpenAI API key (or OpenRouter)
 
 ### Backend Setup
@@ -35,9 +35,10 @@ npm run dev         # http://localhost:5173
 |-----|-------------|
 | `MONGODB_URI` | MongoDB Atlas connection string |
 | `JWT_SECRET` | Min 32 chars secret |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `GOOGLE_REDIRECT_URI` | OAuth redirect URI |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Backend-only Supabase secret key |
+| `SUPABASE_STORAGE_BUCKET` | Private Storage bucket name |
+| `SUPABASE_STORAGE_LIMIT_BYTES` | Application-enforced global storage cap |
 | `OPENAI_API_KEY` | OpenAI or OpenRouter API key |
 | `ENCRYPTION_KEY` | 32-char AES key for token encryption |
 
@@ -48,14 +49,12 @@ npm run dev         # http://localhost:5173
 | `VITE_SOCKET_URL` | Socket.io server URL |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID for GSI |
 
-## Google Cloud Setup
+## Supabase Storage Setup
 
-1. Create a project at [console.cloud.google.com](https://console.cloud.google.com)
-2. Enable **Google Drive API** and **Google+ API**
-3. Create **OAuth 2.0 credentials** (Web application)
-4. Add authorized origins: `http://localhost:5173`
-5. Add authorized redirect URIs: `http://localhost:5000/auth/google/callback`
-6. Copy Client ID and Secret to `.env`
+1. In Supabase, open **Storage** and create a private bucket named `airdrive_storage`.
+2. Open **Project Settings → API Keys** and create a backend secret key.
+3. Copy the project URL and secret key into the backend environment. Never expose the secret key in frontend code.
+4. Keep `SUPABASE_STORAGE_LIMIT_BYTES=900000000` as a safety cap below Supabase Free's 1 GB allowance.
 
 ## Features
 

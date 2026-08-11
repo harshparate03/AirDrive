@@ -9,6 +9,7 @@ const { logActivity, createNotification, getClientInfo } = require('../utils/act
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
 const localService = require('../services/localStorage');
+const storageService = require('../services/supabaseStorage');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const { sanitizeRelativeDirectory } = require('../utils/uploadPaths');
@@ -91,11 +92,16 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
     if ((req.user.storageUsed || 0) + incomingSize > (req.user.storageLimit || 0)) {
       return res.status(413).json({ error: 'Storage limit exceeded' });
     }
-
-    const useGoogle = !!(req.user.googleConnected && req.user.googleAccessToken && req.user.googleRefreshToken);
-    if (!useGoogle && process.env.NODE_ENV === 'production') {
-      return res.status(409).json({ error: 'Connect Google Drive before uploading so your files remain available' });
+    const r2Limit = Number(process.env.SUPABASE_STORAGE_LIMIT_BYTES) || 900000000;
+    const stored = await File.find({ storageType: 'supabase' }).select('size versions.size').lean();
+    const r2Used = stored.reduce((sum, item) => sum + (item.versions?.length
+      ? item.versions.reduce((versionSum, version) => versionSum + (version.size || 0), 0)
+      : (item.size || 0)), 0);
+    if (r2Used + incomingSize > r2Limit) {
+      return res.status(413).json({ error: 'AirDrive cloud storage capacity exceeded' });
     }
+
+    storageService.assertConfigured();
     const io = req.app.get('io');
     const uploadedFiles = [];
 
@@ -103,33 +109,20 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
     if (folderId) {
       destinationFolder = await Folder.findOne({ _id: folderId, userId: req.user._id, trashed: false });
       if (!destinationFolder) return res.status(404).json({ error: 'Destination folder not found' });
-      if (useGoogle && !destinationFolder.googleFolderId) {
-        await ensureGoogleFolder(destinationFolder, req.user, getTokens(req.user));
-      }
     }
 
     const cleanParts = sanitizeRelativeDirectory(relativePath);
     if (cleanParts.length) {
-      const tokens = useGoogle ? getTokens(req.user) : null;
       for (const rawPart of cleanParts) {
         const part = rawPart;
         if (!part) continue;
         let child = await Folder.findOne({ userId: req.user._id, parentFolder: destinationFolder?._id || null, name: part, trashed: false });
         if (!child) {
-          let googleFolderId = '';
-          if (useGoogle) {
-            const driveFolder = await driveService.createDriveFolder(tokens.accessToken, tokens.refreshToken, {
-              name: part,
-              parentFolderId: destinationFolder?.googleFolderId || null,
-            });
-            googleFolderId = driveFolder.id || '';
-          }
           child = await Folder.create({
             userId: req.user._id,
             name: part,
             parentFolder: destinationFolder?._id || null,
             path: destinationFolder ? [...(destinationFolder.path || []), destinationFolder._id] : [],
-            googleFolderId,
           });
         }
         destinationFolder = child;
@@ -140,34 +133,23 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
       const ext = path.extname(file.originalname).toLowerCase();
 
       let googleFileId = '';
+      let r2Key = '';
       let localPath = '';
       let thumbnail = '';
       let webViewLink = '';
       let webContentLink = '';
 
-      if (useGoogle) {
-        const { accessToken, refreshToken } = getTokens(req.user);
-        // Upload to Google Drive
-        const driveFile = await driveService.uploadFile(accessToken, refreshToken, {
-          name: file.originalname,
-          mimeType: file.mimetype,
-          buffer: file.buffer,
-          folderId: destinationFolder?.googleFolderId || null,
-        });
-        googleFileId = driveFile.id || '';
-        thumbnail = driveFile.thumbnailLink || '';
-        webViewLink = driveFile.webViewLink || '';
-        webContentLink = driveFile.webContentLink || '';
-      } else {
-        // Fall back to local disk storage
-        const saved = await localService.saveBuffer(file.buffer, file.originalname);
-        localPath = saved.filePath;
-      }
+      r2Key = `${req.user._id}/${uuidv4()}${ext}`;
+      await storageService.uploadBuffer({
+        key: r2Key, buffer: file.buffer, mimeType: file.mimetype,
+        metadata: { originalname: encodeURIComponent(file.originalname) },
+      });
 
       // Store metadata in MongoDB
       const fileMeta = await File.create({
         googleFileId,
-        storageType: useGoogle ? 'google' : 'local',
+        r2Key,
+        storageType: 'supabase',
         localPath,
         userId: req.user._id,
         folderId: destinationFolder?._id || null,
@@ -181,6 +163,7 @@ router.post('/upload', authenticate, upload.array('files', 20), async (req, res)
         webContentLink,
         versions: [{
           googleFileId,
+          r2Key,
           localPath,
           versionNumber: 1,
           size: file.size,
@@ -266,24 +249,10 @@ router.get('/storage', authenticate, async (req, res) => {
       { $group: { _id: '$category', totalSize: { $sum: '$size' }, count: { $sum: 1 } } },
     ]);
 
-    // Prefer Google Drive quota if connected, otherwise fall back to local Mongo storage
     let storageUsed = user.storageUsed || 0;
-    let storageLimit = user.storageLimit || 15 * 1024 * 1024 * 1024;
+    let storageLimit = Number(process.env.SUPABASE_STORAGE_LIMIT_BYTES) || 900000000;
     let driveUsed = null;
     let trashUsed = null;
-
-    if (req.user.googleConnected && req.user.googleAccessToken) {
-      try {
-        const { accessToken, refreshToken } = getTokens(req.user);
-        const quota = await driveService.getStorageQuota(accessToken, refreshToken);
-        storageUsed = parseInt(quota.usage || storageUsed);
-        storageLimit = parseInt(quota.limit || storageLimit);
-        driveUsed = parseInt(quota.usageInDrive || 0);
-        trashUsed = parseInt(quota.usageInDriveTrash || 0);
-      } catch (_) {
-        // Google Drive API failed - fall back to local stats
-      }
-    }
 
     res.json({
       storageUsed,
@@ -292,7 +261,7 @@ router.get('/storage', authenticate, async (req, res) => {
       trashUsed,
       byCategory,
       localUsed: user.storageUsed,
-      source: req.user.googleConnected ? 'google' : 'local',
+      source: 'supabase',
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch storage info' });
@@ -354,7 +323,9 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     if (permanent === 'true') {
-      if (file.storageType === 'google' && file.googleFileId) {
+      if (file.storageType === 'supabase' && file.r2Key) {
+        await storageService.deleteFileObjects(file);
+      } else if (file.storageType === 'google' && file.googleFileId) {
         const { accessToken, refreshToken } = getTokens(req.user);
         await driveService.deleteFile(accessToken, refreshToken, file.googleFileId);
       } else {
@@ -415,9 +386,13 @@ router.post('/copy', authenticate, async (req, res) => {
 
     const copyName = `Copy of ${file.name}`;
     let googleFileId = '';
+    let r2Key = '';
     let localPath = '';
 
-    if (file.storageType === 'google' && file.googleFileId) {
+    if (file.storageType === 'supabase' && file.r2Key) {
+      r2Key = `${req.user._id}/${uuidv4()}${file.extension || ''}`;
+      await storageService.copyObject(file.r2Key, r2Key);
+    } else if (file.storageType === 'google' && file.googleFileId) {
       const { accessToken, refreshToken } = getTokens(req.user);
       const driveCopy = await driveService.copyFile(accessToken, refreshToken, file.googleFileId, copyName);
       googleFileId = driveCopy.id || '';
@@ -430,6 +405,7 @@ router.post('/copy', authenticate, async (req, res) => {
       ...file.toObject(),
       _id: undefined,
       googleFileId,
+      r2Key,
       storageType: file.storageType,
       localPath,
       name: copyName,
@@ -494,9 +470,13 @@ router.post('/:id/version', authenticate, upload.single('file'), async (req, res
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     let googleFileId = '';
+    let r2Key = '';
     let localPath = '';
 
-    if (file.storageType === 'google' && req.user.googleConnected) {
+    if (file.storageType === 'supabase') {
+      r2Key = `${req.user._id}/${uuidv4()}${file.extension || ''}`;
+      await storageService.uploadBuffer({ key: r2Key, buffer: req.file.buffer, mimeType: req.file.mimetype });
+    } else if (file.storageType === 'google' && req.user.googleConnected) {
       const { accessToken, refreshToken } = getTokens(req.user);
       const driveFile = await driveService.uploadFile(accessToken, refreshToken, {
         name: file.name,
@@ -512,6 +492,7 @@ router.post('/:id/version', authenticate, upload.single('file'), async (req, res
     const newVersion = file.currentVersion + 1;
     file.versions.push({
       googleFileId,
+      r2Key,
       localPath,
       versionNumber: newVersion,
       size: req.file.size,
@@ -520,6 +501,7 @@ router.post('/:id/version', authenticate, upload.single('file'), async (req, res
       note: req.body.note || '',
     });
     file.googleFileId = googleFileId;
+    file.r2Key = r2Key;
     file.localPath = localPath;
     file.currentVersion = newVersion;
     file.size = req.file.size;
@@ -545,6 +527,7 @@ router.post('/:id/restore-version', authenticate, async (req, res) => {
 
     // Set current version to the target's googleFileId / localPath
     file.googleFileId = targetVersion.googleFileId;
+    file.r2Key = targetVersion.r2Key;
     file.localPath = targetVersion.localPath;
     file.currentVersion = targetVersion.versionNumber;
     file.size = targetVersion.size;
@@ -565,9 +548,9 @@ router.get('/:id/preview-info', authenticate, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     let webViewLink = file.webViewLink || '';
-    const available = file.storageType === 'google'
-      ? Boolean(file.googleFileId)
-      : localService.fileExists(file.localPath);
+    const available = file.storageType === 'supabase'
+      ? Boolean(file.r2Key)
+      : file.storageType === 'google' ? Boolean(file.googleFileId) : localService.fileExists(file.localPath);
     if (file.storageType === 'google' && file.googleFileId) {
       try {
         const { accessToken, refreshToken } = getTokens(req.user);
@@ -610,7 +593,7 @@ router.get('/:id/download', authenticate, async (req, res) => {
     const file = await File.findOne({ _id: req.params.id, userId: req.user._id });
     if (!file) return res.status(404).json({ error: 'File not found' });
 
-    if (file.storageType !== 'google' && !localService.fileExists(file.localPath)) {
+    if (file.storageType === 'local' && !localService.fileExists(file.localPath)) {
       return res.status(410).json({
         error: 'File content is no longer available',
         code: 'FILE_CONTENT_MISSING',
@@ -621,7 +604,10 @@ router.get('/:id/download', authenticate, async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`);
     res.setHeader('Content-Type', file.mimeType);
 
-    if (file.storageType === 'google' && file.googleFileId) {
+    if (file.storageType === 'supabase' && file.r2Key) {
+      const stream = await storageService.getStream(file.r2Key);
+      stream.pipe(res);
+    } else if (file.storageType === 'google' && file.googleFileId) {
       const { accessToken, refreshToken } = getTokens(req.user);
       const stream = await driveService.getFileStream(accessToken, refreshToken, file.googleFileId);
       stream.pipe(res);

@@ -10,6 +10,7 @@ const { hashPassword } = require('../utils/encryption');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
 const localService = require('../services/localStorage');
+const storageService = require('../services/supabaseStorage');
 const { ensureFileText } = require('../services/textExtraction');
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
@@ -194,9 +195,8 @@ router.get('/:token/preview-info', optionalAuth, async (req, res) => {
     ]);
     if (!file || !owner) return res.status(404).json({ error: 'File not found' });
 
-    const available = file.storageType === 'google'
-      ? Boolean(file.googleFileId)
-      : localService.fileExists(file.localPath);
+    const available = file.storageType === 'supabase' ? Boolean(file.r2Key)
+      : file.storageType === 'google' ? Boolean(file.googleFileId) : localService.fileExists(file.localPath);
     if (!available) return res.status(410).json({ error: 'File content is no longer available', code: 'FILE_CONTENT_MISSING' });
 
     const extension = (file.extension || '').toLowerCase();
@@ -221,7 +221,7 @@ router.get('/:token/preview', optionalAuth, async (req, res) => {
 
     const file = await File.findOne({ _id: shareLink.fileId, userId: shareLink.userId, trashed: false });
     if (!file) return res.status(404).json({ error: 'File not found' });
-    if (file.storageType !== 'google' && !localService.fileExists(file.localPath)) {
+    if (file.storageType === 'local' && !localService.fileExists(file.localPath)) {
       return res.status(410).json({ error: 'File content is no longer available', code: 'FILE_CONTENT_MISSING' });
     }
 
@@ -229,7 +229,9 @@ router.get('/:token/preview', optionalAuth, async (req, res) => {
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
     res.setHeader('Cache-Control', 'private, max-age=3600');
 
-    if (file.storageType === 'google' && file.googleFileId) {
+    if (file.storageType === 'supabase' && file.r2Key) {
+      (await storageService.getStream(file.r2Key)).pipe(res);
+    } else if (file.storageType === 'google' && file.googleFileId) {
       const { accessToken, refreshToken } = getTokens(await User.findById(shareLink.userId));
       const stream = await driveService.getFileStream(accessToken, refreshToken, file.googleFileId);
       stream.pipe(res);
@@ -254,14 +256,16 @@ router.get('/:token/download', optionalAuth, async (req, res) => {
 
     const file = await File.findOne({ _id: shareLink.fileId, userId: shareLink.userId, trashed: false });
     if (!file) return res.status(404).json({ error: 'File not found' });
-    if (file.storageType !== 'google' && !localService.fileExists(file.localPath)) {
+    if (file.storageType === 'local' && !localService.fileExists(file.localPath)) {
       return res.status(410).json({ error: 'File content is no longer available', code: 'FILE_CONTENT_MISSING' });
     }
 
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.name)}"`);
 
-    if (file.storageType === 'google' && file.googleFileId) {
+    if (file.storageType === 'supabase' && file.r2Key) {
+      (await storageService.getStream(file.r2Key)).pipe(res);
+    } else if (file.storageType === 'google' && file.googleFileId) {
       const { accessToken, refreshToken } = getTokens(await User.findById(shareLink.userId));
       const stream = await driveService.getFileStream(accessToken, refreshToken, file.googleFileId);
       stream.pipe(res);

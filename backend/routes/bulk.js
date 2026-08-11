@@ -4,6 +4,8 @@ const { authenticate } = require('../middleware/auth');
 const File = require('../models/File');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
+const storageService = require('../services/supabaseStorage');
+const localService = require('../services/localStorage');
 const archiver = require('archiver');
 
 const getTokens = (user) => ({
@@ -32,7 +34,9 @@ router.post('/download-zip', authenticate, async (req, res) => {
 
     for (const file of files) {
       try {
-        const stream = await driveService.getFileStream(accessToken, refreshToken, file.googleFileId);
+        const stream = file.storageType === 'supabase' ? await storageService.getStream(file.r2Key)
+          : file.storageType === 'google' ? await driveService.getFileStream(accessToken, refreshToken, file.googleFileId)
+            : localService.createReadStream(file.localPath);
         archive.append(stream, { name: file.name });
       } catch (err) {
         console.warn(`Skipping ${file.name}:`, err.message);
@@ -60,7 +64,11 @@ router.post('/delete', authenticate, async (req, res) => {
     if (permanent === true) {
       const { accessToken, refreshToken } = getTokens(req.user);
       for (const file of files) {
-        try { await driveService.deleteFile(accessToken, refreshToken, file.googleFileId); } catch (_) {}
+        try {
+          if (file.storageType === 'supabase' && file.r2Key) await storageService.deleteFileObjects(file);
+          else if (file.storageType === 'google' && file.googleFileId) await driveService.deleteFile(accessToken, refreshToken, file.googleFileId);
+          else if (file.localPath) await localService.deleteFile(file.localPath);
+        } catch (_) {}
       }
       await File.deleteMany({ _id: { $in: fileIds }, userId: req.user._id });
     } else {

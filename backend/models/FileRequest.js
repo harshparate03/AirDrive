@@ -16,6 +16,7 @@ const fileRequestSchema = new mongoose.Schema({
     size: Number,
     mimeType: String,
     googleFileId: String,
+    r2Key: String,
     uploadedAt: { type: Date, default: Date.now },
     uploaderEmail: String,
   }],

@@ -95,6 +95,10 @@ JWT_REFRESH_EXPIRES_IN=30d
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
 GOOGLE_REDIRECT_URI=https://airdrive-backend-6k4c.onrender.com/auth/google/callback
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<backend-only-secret-key>
+SUPABASE_STORAGE_BUCKET=airdrive_storage
+SUPABASE_STORAGE_LIMIT_BYTES=900000000
 OPENAI_API_KEY=<optional-openai-key>
 OPENAI_BASE_URL=https://api.openai.com/v1
 ENCRYPTION_KEY=<32-character-key>
@@ -114,6 +118,15 @@ GOOGLE_APPS_SCRIPT_EMAIL_SECRET=<long-random-secret>
 GOOGLE_APPS_SCRIPT_FROM_NAME=AirDrive
 CLIENT_URL=https://air-drive-snowy.vercel.app
 ```
+
+### Supabase Storage
+
+1. In the Supabase dashboard, open **Storage** and create a private `airdrive_storage` bucket.
+2. Open **Project Settings → API Keys** and create a backend secret key.
+3. Add the four `SUPABASE_*` variables above to the Render service.
+4. Save the environment and run **Manual Deploy → Clear build cache & deploy**.
+
+Keep the bucket private. AirDrive proxies authorized downloads and previews through the backend; no public bucket URL is required.
 
 ### Free Gmail delivery with Google Apps Script
 

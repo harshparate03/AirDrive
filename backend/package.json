@@ -17,6 +17,7 @@
   "author": "Air Drive",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
     "archiver": "^8.0.0",
     "axios": "^1.19.0",
     "bcryptjs": "^2.4.3",

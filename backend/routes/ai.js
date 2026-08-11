@@ -272,6 +272,7 @@ router.post('/rename/apply', authenticate, async (req, res) => {
         const { accessToken, refreshToken } = getTokens(req.user);
         await driveService.renameFile(accessToken, refreshToken, file.googleFileId, sanitized);
       }
+      // Supabase object keys are immutable and independent of display names.
       file.name = sanitized;
       file.aiRenamedFrom = oldName;
       await file.save();

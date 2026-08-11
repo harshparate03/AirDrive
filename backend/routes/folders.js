@@ -6,6 +6,7 @@ const File = require('../models/File');
 const { logActivity, getClientInfo } = require('../utils/activityLogger');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
+const storageService = require('../services/supabaseStorage');
 
 const getTokens = (user) => ({
   accessToken: decrypt(user.googleAccessToken),
@@ -45,16 +46,6 @@ router.post('/', authenticate, async (req, res) => {
       pathArr = [...(parent.path || []), parent._id];
     }
 
-    let googleFolderId = '';
-    if (req.user.googleConnected && req.user.googleAccessToken && req.user.googleRefreshToken) {
-      const { accessToken, refreshToken } = getTokens(req.user);
-      const driveFolder = await driveService.createDriveFolder(accessToken, refreshToken, {
-        name: name.trim(),
-        parentFolderId: parent?.googleFolderId || null,
-      });
-      googleFolderId = driveFolder.id || '';
-    }
-
     const folder = await Folder.create({
       userId: req.user._id,
       name: name.trim(),
@@ -62,7 +53,6 @@ router.post('/', authenticate, async (req, res) => {
       color: color || '#6366f1',
       icon: icon || 'folder',
       path: pathArr,
-      googleFolderId,
     });
 
     await logActivity({ userId: req.user._id, action: 'create_folder', folderId: folder._id, details: `Created folder: ${name}`, ...getClientInfo(req) });
@@ -111,7 +101,9 @@ router.delete('/:id', authenticate, async (req, res) => {
       const files = await File.find({ folderId: { $in: folderIds }, userId: req.user._id });
       const { accessToken, refreshToken } = getTokens(req.user);
       for (const file of files) {
-        if (file.storageType === 'google' && file.googleFileId) {
+        if (file.storageType === 'supabase' && file.r2Key) {
+          await storageService.deleteFileObjects(file);
+        } else if (file.storageType === 'google' && file.googleFileId) {
           await driveService.deleteFile(accessToken, refreshToken, file.googleFileId);
         } else if (file.localPath) {
           await require('../services/localStorage').deleteFile(file.localPath);
@@ -119,12 +111,6 @@ router.delete('/:id', authenticate, async (req, res) => {
       }
       const removedSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
       await File.deleteMany({ _id: { $in: files.map(file => file._id) } });
-      const foldersToDelete = await Folder.find({ _id: { $in: folderIds }, userId: req.user._id });
-      for (const item of foldersToDelete.reverse()) {
-        if (item.googleFolderId) {
-          await driveService.deleteFile(accessToken, refreshToken, item.googleFolderId).catch(() => {});
-        }
-      }
       await Folder.deleteMany({ _id: { $in: folderIds }, userId: req.user._id });
       if (removedSize) await require('../models/User').findByIdAndUpdate(req.user._id, { $inc: { storageUsed: -removedSize } });
     } else {
