@@ -28,7 +28,7 @@ const StructuredAIText = ({ content }) => {
   return <div className="space-y-2 text-sm leading-6 text-dark-600 dark:text-dark-200">{lines.map((line, index) => {
     const clean = line.replace(/^#{1,6}\s*/, '').replace(/^\*\*(.*?)\*\*:?$/, '$1')
     if (/^#{1,6}\s/.test(line) || /^\*\*.*\*\*:?$/.test(line)) return <h3 key={index} className="pt-2 text-base font-semibold text-dark-800 dark:text-white">{clean}</h3>
-    if (/^[-*+\u2022]\s+/.test(line)) return <div key={index} className="flex gap-2 pl-2"><span className="text-primary-500">&bull;</span><span>{line.replace(/^[-*+\u2022]\s+/, '')}</span></div>
+    if (/^[-*â€¢]\s+/.test(line)) return <div key={index} className="flex gap-2 pl-2"><span className="text-primary-500">•</span><span>{line.replace(/^[-*â€¢]\s+/, '')}</span></div>
     if (/^\d+[.)]\s+/.test(line)) return <div key={index} className="flex gap-2 pl-2"><span className="font-semibold text-primary-500">{line.match(/^\d+[.)]/)?.[0]}</span><span>{line.replace(/^\d+[.)]\s+/, '')}</span></div>
     return <p key={index}>{line}</p>
   })}</div>
@@ -227,7 +227,7 @@ const AIAssistantPage = () => {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-140px)] flex-col gap-4 animate-fade-in lg:h-[calc(100vh-140px)] lg:flex-row lg:overflow-hidden">
+    <div className="min-h-[calc(100vh-140px)] lg:h-[calc(100vh-140px)] flex flex-col lg:flex-row gap-4 animate-fade-in">
       {/* Left: Feature panel */}
       <div className="w-full lg:w-64 flex-shrink-0">
         <h2 className="text-sm font-semibold text-dark-500 dark:text-dark-400 uppercase tracking-wider px-1 mb-3">
@@ -288,7 +288,7 @@ const AIAssistantPage = () => {
       </div>
 
       {/* Right: Main panel */}
-      <div className="card flex h-[calc(100dvh-9rem)] min-h-[620px] flex-1 flex-col overflow-hidden lg:h-full lg:min-h-0">
+      <div className="flex h-[calc(100dvh-11rem)] min-h-[500px] flex-1 flex-col overflow-hidden card lg:h-auto lg:min-h-0">
         {/* Header */}
         <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-dark-700">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
@@ -403,44 +403,35 @@ const AIAssistantPage = () => {
         )}
 
         {activeFeature === 'summary' && (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-            <aside className="flex-shrink-0 space-y-4 overflow-y-auto border-b border-slate-100 p-4 dark:border-dark-700 lg:w-80 lg:border-b-0 lg:border-r sm:p-5">
-              <ContextFileCard
-                files={filesData?.files || []}
-                selectedFile={selectedFile}
-                onSelect={(file) => { setSelectedFile(file); summaryMutation.reset() }}
-                onUpload={() => dispatch(openModal({ modal: 'upload', data: { selectForAI: true, aiFeature: 'summary' } }))}
-                title="Document to summarize"
-              />
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark-400">Analysis type</p>
-                <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
-                  {[
-                    ['summary', 'Summary'], ['important', 'Key points'], ['explain', 'Explain simply'], ['notes', 'Study notes'],
-                  ].map(([value, label]) => (
-                    <button key={value} onClick={() => { setSummaryType(value); summaryMutation.reset() }} className={`${summaryType === value ? 'border-primary-500 bg-primary-600 text-white shadow-sm' : 'border-slate-200 bg-white text-dark-600 hover:border-primary-300 hover:bg-primary-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700'} rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition`}>{label}</button>
-                  ))}
-                </div>
+          <div className="p-4 sm:p-6 space-y-5 flex-1 overflow-y-auto">
+            <ContextFileCard
+              files={filesData?.files || []}
+              selectedFile={selectedFile}
+              onSelect={(file) => { setSelectedFile(file); summaryMutation.reset() }}
+              onUpload={() => dispatch(openModal({ modal: 'upload', data: { selectForAI: true, aiFeature: 'summary' } }))}
+              title="Document to summarize"
+            />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                ['summary', 'Summary'], ['important', 'Key points'], ['explain', 'Explain simply'], ['notes', 'Study notes'],
+              ].map(([value, label]) => (
+                <button key={value} onClick={() => { setSummaryType(value); summaryMutation.reset() }} className={`${summaryType === value ? 'border-primary-500 bg-primary-600 text-white shadow-sm' : 'border-slate-200 bg-white text-dark-600 hover:border-primary-300 hover:bg-primary-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700'} rounded-xl border px-3 py-3 text-sm font-medium transition`}>{label}</button>
+              ))}
+            </div>
+            <button
+              onClick={() => summaryMutation.mutate({ fileId: selectedFile._id, type: summaryType })}
+              disabled={!selectedFile || summaryMutation.isPending}
+              className="btn-primary flex items-center gap-2"
+            >
+              <HiDocument /> {summaryMutation.isPending ? 'Analyzing document...' : 'Analyze document'}
+            </button>
+            {!selectedFile && <p className="text-sm text-amber-600">Select a context file first.</p>}
+            {summaryMutation.data && (
+              <div className="rounded-xl border border-slate-200 dark:border-dark-700 bg-slate-50 dark:bg-dark-800 p-4 sm:p-5">
+                <h3 className="font-semibold text-dark-800 dark:text-white mb-3">Result</h3>
+                <StructuredAIText content={summaryMutation.data.data.response} />
               </div>
-              <button
-                onClick={() => summaryMutation.mutate({ fileId: selectedFile._id, type: summaryType })}
-                disabled={!selectedFile || summaryMutation.isPending}
-                className="btn-primary flex w-full items-center justify-center gap-2"
-              >
-                <HiDocument /> {summaryMutation.isPending ? 'Analyzing...' : 'Analyze document'}
-              </button>
-            </aside>
-            <section className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50 p-4 dark:bg-dark-900/30 sm:p-6 lg:p-8">
-              {summaryMutation.isPending && <div className="flex h-full min-h-64 flex-col items-center justify-center text-center"><div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" /><h3 className="font-semibold text-dark-700 dark:text-dark-200">Analyzing your document</h3><p className="mt-1 text-sm text-dark-400">Creating a structured {summaryType}...</p></div>}
-              {!summaryMutation.isPending && !summaryMutation.data && <div className="flex h-full min-h-64 flex-col items-center justify-center text-center"><div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-100 text-2xl text-primary-600 dark:bg-primary-900/30 dark:text-primary-300"><HiDocument /></div><h3 className="font-semibold text-dark-700 dark:text-dark-200">Your analysis will appear here</h3><p className="mt-1 max-w-sm text-sm text-dark-400">Select a file and analysis type, then click Analyze document.</p></div>}
-              {!summaryMutation.isPending && summaryMutation.data && (
-                <article className="mx-auto w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800 sm:p-7">
-                  <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-dark-700"><div><p className="text-xs font-semibold uppercase tracking-wide text-primary-500">{summaryType.replace('important', 'Key points').replace('notes', 'Study notes')}</p><h3 className="mt-1 font-semibold text-dark-800 dark:text-white">{selectedFile?.name}</h3></div><HiSparkles className="text-xl text-primary-500" /></div>
-                  <StructuredAIText content={summaryMutation.data.data.response} />
-                </article>
-              )}
-              {!selectedFile && !summaryMutation.data && !summaryMutation.isPending && <p className="mt-4 text-center text-sm text-amber-600">Select or upload a document to begin.</p>}
-            </section>
+            )}
           </div>
         )}
 
