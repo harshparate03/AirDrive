@@ -1,7 +1,7 @@
 import { useDispatch } from 'react-redux'
 import { useQueryClient } from '@tanstack/react-query'
 import { addToQueue, setUploadStatus, updateProgress, setIsUploading } from '../store/slices/uploadSlice'
-import { uploadFiles } from '../services/api'
+import api, { uploadFiles } from '../services/api'
 import toast from 'react-hot-toast'
 
 const genId = () =>
@@ -28,12 +28,14 @@ const useUpload = (folderId = null) => {
       dispatch(setUploadStatus({ id, status: 'completed' }))
       return true
     } catch (error) {
+      const driveRequired = error.response?.status === 409
+        && /connect google drive/i.test(error.response?.data?.error || '')
       dispatch(setUploadStatus({
         id,
         status: 'error',
         error: error.response?.data?.error || 'Upload failed',
       }))
-      return false
+      return driveRequired ? 'drive-required' : false
     }
   }
 
@@ -56,6 +58,24 @@ const useUpload = (folderId = null) => {
 
     for (const item of queueItems) {
       const ok = await uploadOne(item.file, item.id)
+      if (ok === 'drive-required') {
+        // Do not send every queued file when the account cannot store any of them.
+        queueItems.forEach(queued => {
+          if (queued.id !== item.id) {
+            dispatch(setUploadStatus({ id: queued.id, status: 'error', error: 'Connect Google Drive to upload' }))
+          }
+        })
+        dispatch(setIsUploading(false))
+        toast.loading('Opening Google Drive connection...', { duration: 2500 })
+        try {
+          const { data } = await api.get('/auth/google/connect')
+          window.location.assign(data.url)
+        } catch (error) {
+          toast.error(error.response?.data?.error || 'Open Settings and connect Google Drive')
+          window.location.assign('/settings?connectDrive=1')
+        }
+        return
+      }
       if (ok) successCount += 1
     }
 

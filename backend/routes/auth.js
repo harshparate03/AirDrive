@@ -8,6 +8,7 @@ const { logActivity, createNotification, getClientInfo } = require('../utils/act
 const { encrypt, decrypt } = require('../utils/encryption');
 const { generateOTP, verifyOTP, generateToken } = require('../utils/otp');
 const { sendOTPEmail, sendWelcomeEmail, sendPasswordChangedEmail } = require('../utils/sendEmail');
+const driveService = require('../services/googleDrive');
 
 // Helper to issue tokens and set session
 const issueTokens = async (user, clientInfo, isNewUser, io) => {
@@ -65,6 +66,71 @@ const issueTokens = async (user, clientInfo, isNewUser, io) => {
 
   return { accessToken: accessTokenJWT, refreshToken };
 };
+
+// GET /api/auth/google/connect - Begin the Google Drive OAuth flow
+router.get('/google/connect', authenticate, (req, res) => {
+  try {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+      return res.status(503).json({ error: 'Google Drive connection is not configured on the server' });
+    }
+    const state = require('jsonwebtoken').sign(
+      { userId: req.user._id.toString(), purpose: 'google-drive-connect' },
+      process.env.JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+    res.json({ url: driveService.getAuthUrl(state) });
+  } catch (error) {
+    console.error('Google connect error:', error);
+    res.status(500).json({ error: 'Failed to start Google Drive connection' });
+  }
+});
+
+// GET /api/auth/google/callback - Store Drive credentials and return to Settings
+router.get('/google/callback', async (req, res) => {
+  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+  const redirect = (status, message = '') => {
+    const params = new URLSearchParams({ drive: status });
+    if (message) params.set('message', message);
+    return res.redirect(`${clientUrl}/settings?${params.toString()}`);
+  };
+
+  try {
+    if (req.query.error) return redirect('error', 'Google authorization was cancelled');
+    if (!req.query.code || !req.query.state) return redirect('error', 'Invalid Google authorization response');
+
+    const jwt = require('jsonwebtoken');
+    const state = jwt.verify(req.query.state, process.env.JWT_SECRET);
+    if (state.purpose !== 'google-drive-connect' || !state.userId) {
+      return redirect('error', 'Invalid or expired connection request');
+    }
+
+    const tokens = await driveService.getTokensFromCode(req.query.code);
+    if (!tokens.access_token) return redirect('error', 'Google did not return an access token');
+
+    const user = await User.findById(state.userId);
+    if (!user || !user.isActive) return redirect('error', 'AirDrive account was not found');
+
+    user.googleAccessToken = encrypt(tokens.access_token);
+    // Google may omit a refresh token on a repeat authorization; keep the old one.
+    if (tokens.refresh_token) user.googleRefreshToken = encrypt(tokens.refresh_token);
+    if (!user.googleRefreshToken) return redirect('error', 'Google did not grant offline Drive access. Please reconnect and approve access.');
+    user.googleConnected = true;
+    await user.save();
+    return redirect('connected');
+  } catch (error) {
+    console.error('Google callback error:', error);
+    return redirect('error', 'Could not connect Google Drive. Please try again.');
+  }
+});
+
+// DELETE /api/auth/google/connect - Disconnect without deleting files in Drive
+router.delete('/google/connect', authenticate, async (req, res) => {
+  req.user.googleAccessToken = '';
+  req.user.googleRefreshToken = '';
+  req.user.googleConnected = false;
+  await req.user.save();
+  res.json({ message: 'Google Drive disconnected', user: req.user.toPublic() });
+});
 
 // POST /api/auth/register - Create a new account
 router.post('/register', async (req, res) => {
