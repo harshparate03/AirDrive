@@ -11,6 +11,7 @@ import NotificationPanel from '../notifications/NotificationPanel'
 import { useQuery } from '@tanstack/react-query'
 import api from '../../services/api'
 import { setNotifications } from '../../store/slices/notificationSlice'
+import toast from 'react-hot-toast'
 
 const TopBar = () => {
   const dispatch = useDispatch()
@@ -20,7 +21,9 @@ const TopBar = () => {
   const { unreadCount } = useSelector(state => state.notifications)
   const [search, setSearch] = useState('')
   const [showNotifications, setShowNotifications] = useState(false)
+  const [isListening, setIsListening] = useState(false)
   const notifRef = useRef(null)
+  const recognitionRef = useRef(null)
   const supportsFileView = ['/my-drive', '/recent', '/starred', '/trash', '/shared', '/search']
     .some(path => location.pathname === path || location.pathname.startsWith(`${path}/`))
     || location.pathname.startsWith('/folder/')
@@ -47,6 +50,8 @@ const TopBar = () => {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  useEffect(() => () => recognitionRef.current?.stop(), [])
+
   const handleSearch = (e) => {
     e.preventDefault()
     if (search.trim()) {
@@ -56,17 +61,34 @@ const TopBar = () => {
   }
 
   const handleVoiceSearch = () => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-      const recognition = new SR()
-      recognition.lang = 'en-US'
-      recognition.onresult = (e) => {
-        const transcript = e.results[0][0].transcript
-        setSearch(transcript)
-        navigate(`/search?q=${encodeURIComponent(transcript)}`)
-      }
-      recognition.start()
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
     }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) {
+      toast.error('Voice search is not supported in this browser')
+      return
+    }
+    const recognition = new SR()
+    recognition.lang = navigator.language || 'en-US'
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.trim()
+      setSearch(transcript)
+      dispatch(setSearchQuery(transcript))
+      navigate(`/search?q=${encodeURIComponent(transcript)}`)
+    }
+    recognition.onend = () => setIsListening(false)
+    recognition.onerror = (event) => {
+      setIsListening(false)
+      if (event.error !== 'aborted') toast.error(event.error === 'not-allowed' ? 'Microphone permission was denied' : 'Voice search could not start')
+    }
+    recognitionRef.current = recognition
+    setIsListening(true)
+    recognition.start()
   }
 
   return (
@@ -89,13 +111,13 @@ const TopBar = () => {
             placeholder="Search files..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="input h-11 pl-9 pr-9 text-sm sm:pl-10 sm:pr-10"
+            className={`input h-11 pl-9 text-sm sm:pl-10 ${search ? 'pr-20' : 'pr-12'}`}
           />
           {search && (
             <button
               type="button"
               onClick={() => setSearch('')}
-              className="touch-target absolute right-8 text-dark-400 hover:text-dark-600 sm:right-10"
+              className="absolute right-11 flex h-8 w-8 items-center justify-center rounded-lg text-dark-400 transition hover:bg-slate-100 hover:text-dark-600 dark:hover:bg-dark-700 dark:hover:text-dark-200"
               aria-label="Clear search"
             >
               <HiX />
@@ -104,10 +126,12 @@ const TopBar = () => {
           <button
             type="button"
             onClick={handleVoiceSearch}
-            className="touch-target absolute right-0 hidden text-dark-400 hover:text-primary-500 transition-colors sm:flex"
-            title="Voice search"
+            className={`absolute right-1.5 flex h-8 w-8 items-center justify-center rounded-lg transition ${isListening ? 'bg-red-50 text-red-600 ring-2 ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900/50' : 'text-dark-400 hover:bg-slate-100 hover:text-primary-500 dark:hover:bg-dark-700'}`}
+            title={isListening ? 'Listening… click to stop' : 'Voice search'}
+            aria-label={isListening ? 'Stop voice search' : 'Start voice search'}
           >
-            <HiMicrophone />
+            {isListening && <span className="absolute inset-1 animate-ping rounded-md bg-red-300/30" />}
+            <HiMicrophone className="relative text-lg" />
           </button>
         </div>
       </form>
