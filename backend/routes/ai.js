@@ -8,15 +8,28 @@ const { logActivity: logActivityFn, createNotification: createNotificationFn, ge
 const driveService = require('../services/googleDrive');
 const { ensureFileText } = require('../services/textExtraction');
 const OpenAI = require('openai');
+const {
+  isAIConfigured, getAIModel, generateLocalTags, summarizeLocally,
+  suggestLocalName, suggestFoldersLocally, answerLocally,
+} = require('../services/aiFallback');
 
 const getOpenAI = () => new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY.trim(),
   baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
 });
 
 const getTokens = (user) => ({
   accessToken: decrypt(user.googleAccessToken),
   refreshToken: decrypt(user.googleRefreshToken),
+});
+
+// GET /api/ai/status - Safe provider status for the UI (never exposes credentials)
+router.get('/status', authenticate, (req, res) => {
+  res.json({
+    configured: isAIConfigured(),
+    mode: isAIConfigured() ? 'provider' : 'local',
+    model: isAIConfigured() ? getAIModel() : 'local-fallback',
+  });
 });
 
 // POST /api/ai/chat - Chat with file / general AI chat
@@ -26,19 +39,29 @@ router.post('/chat', authenticate, async (req, res) => {
     const { message, fileId, conversationHistory = [] } = req.body;
     if (!message) return res.status(400).json({ error: 'Message required' });
 
-    const openai = getOpenAI();
     let systemPrompt = 'You are Air Drive AI Assistant, a helpful assistant for managing cloud files and documents.';
     let fileContext = '';
+    let contextFile = null;
 
     if (fileId) {
       const file = await File.findOne({ _id: fileId, userId: req.user._id });
       if (file) {
+        contextFile = file;
         await ensureFileText(file, req.user).catch(() => '');
         fileContext = `\nFile: ${file.name}\nType: ${file.mimeType}\nSize: ${file.size} bytes`;
         if (file.ocrText) fileContext += `\nContent:\n${file.ocrText.substring(0, 8000)}`;
         systemPrompt = `You are Air Drive AI. You are analyzing a file: ${file.name}. ${fileContext}`;
       }
     }
+
+    if (!isAIConfigured()) {
+      const response = answerLocally({ message, file: contextFile, content: contextFile?.ocrText });
+      await AIHistory.create({ userId: req.user._id, fileId: fileId || null, type: 'chat', prompt: message, response, model: 'local-fallback', duration: Date.now() - start });
+      await logActivityFn({ userId: req.user._id, action: 'ai_chat', fileId: fileId || null, details: 'Used AI assistant local fallback', ...getClientInfoFn(req) });
+      return res.json({ response, tokens: 0, mode: 'local' });
+    }
+
+    const openai = getOpenAI();
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -47,7 +70,7 @@ router.post('/chat', authenticate, async (req, res) => {
     ];
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: getAIModel(),
       messages,
       max_tokens: 2000,
       temperature: 0.7,
@@ -63,9 +86,11 @@ router.post('/chat', authenticate, async (req, res) => {
       prompt: message,
       response,
       tokens,
-      model: 'gpt-4o-mini',
+      model: getAIModel(),
       duration: Date.now() - start,
     });
+
+    await logActivityFn({ userId: req.user._id, action: 'ai_chat', fileId: fileId || null, details: 'Used AI assistant', ...getClientInfoFn(req) });
 
     res.json({ response, tokens });
   } catch (error) {
@@ -84,8 +109,6 @@ router.post('/summary', authenticate, async (req, res) => {
 
     const extractedText = await ensureFileText(file, req.user).catch(() => '');
     const content = extractedText || `File: ${file.name}\nType: ${file.mimeType}`;
-    const openai = getOpenAI();
-
     const prompts = {
       summary: `Summarize the following content concisely:\n\n${content.substring(0, 8000)}`,
       explain: `Explain the following content in simple terms:\n\n${content.substring(0, 8000)}`,
@@ -93,8 +116,17 @@ router.post('/summary', authenticate, async (req, res) => {
       notes: `Generate structured study notes from:\n\n${content.substring(0, 8000)}`,
     };
 
+    if (!isAIConfigured()) {
+      const response = summarizeLocally(content, type);
+      await AIHistory.create({ userId: req.user._id, fileId, type: 'summary', prompt: type, response, model: 'local-fallback', duration: Date.now() - start });
+      await logActivityFn({ userId: req.user._id, action: 'ai_summary', fileId, details: `Generated local ${type}`, ...getClientInfoFn(req) });
+      return res.json({ response, type, tokens: 0, mode: 'local' });
+    }
+
+    const openai = getOpenAI();
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: getAIModel(),
       messages: [
         { role: 'system', content: 'You are an expert document analyst.' },
         { role: 'user', content: prompts[type] || prompts.summary },
@@ -114,6 +146,7 @@ router.post('/summary', authenticate, async (req, res) => {
       tokens,
       duration: Date.now() - start,
     });
+    await logActivityFn({ userId: req.user._id, action: 'ai_summary', fileId, details: `Generated ${type}`, ...getClientInfoFn(req) });
 
     await createNotificationFn(req.app.get('io'), req.user._id, {
       type: 'ai', title: 'Document Analysis Ready', message: `${type} completed for ${file.name}`,
@@ -122,7 +155,8 @@ router.post('/summary', authenticate, async (req, res) => {
 
     res.json({ response, type, tokens });
   } catch (error) {
-    res.status(500).json({ error: 'AI summary failed' });
+    console.error('AI summary error:', error.message);
+    res.status(500).json({ error: 'AI summary failed', details: error.message });
   }
 });
 
@@ -135,11 +169,21 @@ router.post('/tags', authenticate, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     await ensureFileText(file, req.user).catch(() => '');
-    const openai = getOpenAI();
     const content = `Filename: ${file.name}\nType: ${file.mimeType}\nOCR Text: ${(file.ocrText || '').substring(0, 2000)}`;
 
+    if (!isAIConfigured()) {
+      const tags = generateLocalTags(file);
+      file.aiTags = tags;
+      await file.save();
+      await AIHistory.create({ userId: req.user._id, fileId, type: 'tags', response: JSON.stringify(tags), model: 'local-fallback', duration: Date.now() - start });
+      await logActivityFn({ userId: req.user._id, action: 'ai_tag', fileId: file._id, details: `Generated ${tags.length} local tags`, ...getClientInfoFn(req) });
+      return res.json({ tags, file, mode: 'local' });
+    }
+
+    const openai = getOpenAI();
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: getAIModel(),
       messages: [
         { role: 'system', content: 'Generate 5-10 relevant tags for a file. Return only a JSON array of tag strings.' },
         { role: 'user', content },
@@ -186,7 +230,8 @@ let tags = [];
 
     res.json({ tags, file });
   } catch (error) {
-    res.status(500).json({ error: 'AI tagging failed' });
+    console.error('AI tagging error:', error.message);
+    res.status(500).json({ error: 'AI tagging failed', details: error.message });
   }
 });
 
@@ -199,12 +244,20 @@ router.post('/rename', authenticate, async (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     await ensureFileText(file, req.user).catch(() => '');
-    const openai = getOpenAI();
     const tags = Array.isArray(file.aiTags) ? file.aiTags.join(', ') : '';
     const content = `Current name: ${file.name}\nType: ${file.mimeType}\nCategory: ${file.category || 'other'}\nTags: ${tags}\nOCR preview: ${(file.ocrText || '').substring(0, 500)}`;
 
+    if (!isAIConfigured()) {
+      const suggestedName = suggestLocalName(file);
+      const reason = 'Generated locally from the filename, type, category, and extracted text.';
+      await AIHistory.create({ userId: req.user._id, fileId, type: 'rename', prompt: file.name, response: suggestedName, model: 'local-fallback', duration: Date.now() - start });
+      return res.json({ suggestedName, reason, originalName: file.name, mode: 'local' });
+    }
+
+    const openai = getOpenAI();
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: getAIModel(),
       messages: [
         { role: 'system', content: 'Suggest a meaningful, descriptive filename for this file. Keep the original extension. Return JSON: {"suggestedName": "...", "reason": "..."}' },
         { role: 'user', content },
@@ -297,13 +350,22 @@ router.post('/rename/apply', authenticate, async (req, res) => {
 router.post('/folder-suggestion', authenticate, async (req, res) => {
   try {
     const { fileIds } = req.body;
+    if (!Array.isArray(fileIds) || fileIds.length === 0) return res.status(400).json({ error: 'Select at least one file' });
     const files = await File.find({ _id: { $in: fileIds }, userId: req.user._id }).lean();
+    if (!files.length) return res.status(404).json({ error: 'No files found' });
+
+    if (!isAIConfigured()) {
+      const suggestions = suggestFoldersLocally(files);
+      await AIHistory.create({ userId: req.user._id, type: 'folder_suggestion', response: JSON.stringify(suggestions), model: 'local-fallback' });
+      await logActivityFn({ userId: req.user._id, action: 'ai_folder_suggestion', details: `Suggested ${suggestions.length} folders locally`, ...getClientInfoFn(req) });
+      return res.json({ suggestions, mode: 'local' });
+    }
 
     const openai = getOpenAI();
     const fileList = files.map(f => `${f.name} (${f.category})`).join('\n');
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: getAIModel(),
       messages: [
         { role: 'system', content: 'Suggest folder organization for these files. Return JSON: {"suggestions": [{"folder": "...", "files": ["filename1", ...], "reason": "..."}]}' },
         { role: 'user', content: fileList },
@@ -313,9 +375,12 @@ router.post('/folder-suggestion', authenticate, async (req, res) => {
     });
 
     const result = JSON.parse(completion.choices[0].message.content);
+    await AIHistory.create({ userId: req.user._id, type: 'folder_suggestion', response: JSON.stringify(result.suggestions || []), model: getAIModel() });
+    await logActivityFn({ userId: req.user._id, action: 'ai_folder_suggestion', details: `Suggested ${(result.suggestions || []).length} folders`, ...getClientInfoFn(req) });
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Folder suggestion failed' });
+    console.error('Folder suggestion error:', error.message);
+    res.status(500).json({ error: 'Folder suggestion failed', details: error.message });
   }
 });
 
@@ -346,9 +411,13 @@ router.post('/duplicates', authenticate, async (req, res) => {
       }
     }
 
-    res.json({ exactDuplicates: duplicates, similarNames: nameSimilar.slice(0, 20) });
+    const similarNames = nameSimilar.slice(0, 20);
+    await AIHistory.create({ userId: req.user._id, type: 'duplicate_detection', response: JSON.stringify({ exact: duplicates.length, similar: similarNames.length }), model: 'local-analysis' });
+    await logActivityFn({ userId: req.user._id, action: 'duplicate_scan', details: `Found ${duplicates.length + similarNames.length} duplicate groups`, ...getClientInfoFn(req) });
+    res.json({ exactDuplicates: duplicates, similarNames });
   } catch (error) {
-    res.status(500).json({ error: 'Duplicate detection failed' });
+    console.error('Duplicate detection error:', error.message);
+    res.status(500).json({ error: 'Duplicate detection failed', details: error.message });
   }
 });
 
@@ -357,11 +426,27 @@ router.post('/smart-search', authenticate, async (req, res) => {
   try {
     const { query } = req.body;
     if (!query?.trim()) return res.status(400).json({ error: 'Search query required' });
+    if (!isAIConfigured()) {
+      const terms = String(query).toLowerCase().split(/[^a-z0-9]+/).filter(term => term.length > 1).slice(0, 8);
+      const patterns = (terms.length ? terms : [String(query)]).map(term => String(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 80));
+      const files = await File.find({
+        userId: req.user._id,
+        trashed: false,
+        $or: patterns.flatMap(pattern => [
+          { name: { $regex: pattern, $options: 'i' } },
+          { ocrText: { $regex: pattern, $options: 'i' } },
+          { aiTags: { $in: [new RegExp(pattern, 'i')] } },
+        ]),
+      }).limit(50).lean();
+      await AIHistory.create({ userId: req.user._id, type: 'smart_search', prompt: query, response: JSON.stringify({ count: files.length }), model: 'local-fallback' });
+      await logActivityFn({ userId: req.user._id, action: 'ai_search', details: `Local smart search returned ${files.length} files`, ...getClientInfoFn(req) });
+      return res.json({ files, params: { searchText: query }, query, mode: 'local' });
+    }
     const openai = getOpenAI();
 
     // Ask AI to convert natural language to search params
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: getAIModel(),
       messages: [
         { role: 'system', content: 'Convert natural language file search to search parameters. Return JSON: {"name": "...", "category": "...", "tags": [], "dateRange": {"from": "...", "to": "..."}, "searchText": "..."}' },
         { role: 'user', content: query },
@@ -401,10 +486,12 @@ router.post('/smart-search', authenticate, async (req, res) => {
       prompt: query,
       response: JSON.stringify({ params, count: files.length }),
     });
+    await logActivityFn({ userId: req.user._id, action: 'ai_search', details: `Smart search returned ${files.length} files`, ...getClientInfoFn(req) });
 
     res.json({ files, params, query });
   } catch (error) {
-    res.status(500).json({ error: 'Smart search failed' });
+    console.error('Smart search error:', error.message);
+    res.status(500).json({ error: 'Smart search failed', details: error.message });
   }
 });
 
