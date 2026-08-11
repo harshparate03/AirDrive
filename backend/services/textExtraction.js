@@ -5,6 +5,7 @@ const JSZip = require('jszip');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('./googleDrive');
 const localService = require('./localStorage');
+const storageService = require('./supabaseStorage');
 
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_TEXT_LENGTH = 50000;
@@ -60,6 +61,7 @@ const extractZipDocument = async (buffer, extension) => {
 };
 
 const getBuffer = async (file, user) => {
+  if (file.storageType === 'supabase' && file.r2Key) return storageService.getBuffer(file.r2Key);
   if (file.storageType === 'google' && file.googleFileId) {
     return driveService.downloadFile(decrypt(user.googleAccessToken), decrypt(user.googleRefreshToken), file.googleFileId);
   }

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
 import { HiUser, HiMoon, HiSun, HiShieldCheck, HiTrash, HiBell, HiLockClosed, HiEye, HiEyeOff, HiCloud } from 'react-icons/hi'
-import { updateProfile, changePassword, fetchProfile } from '../store/slices/authSlice'
+import { updateProfile, changePassword } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
 import toast from 'react-hot-toast'
 import api from '../services/api'
@@ -23,46 +23,6 @@ const SettingsPage = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
   const [showPasswords, setShowPasswords] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
-  const [connectingDrive, setConnectingDrive] = useState(false)
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const driveStatus = params.get('drive')
-    if (params.get('connectDrive') === '1' && !user?.googleConnected) {
-      toast.error('Connect Google Drive before uploading')
-    }
-    if (!driveStatus) return
-    if (driveStatus === 'connected') {
-      toast.success('Google Drive connected')
-      dispatch(fetchProfile())
-    } else {
-      toast.error(params.get('message') || 'Could not connect Google Drive')
-    }
-    window.history.replaceState({}, '', window.location.pathname)
-  }, [dispatch, user?.googleConnected])
-
-  const connectDrive = async () => {
-    setConnectingDrive(true)
-    try {
-      const { data } = await api.get('/auth/google/connect')
-      window.location.assign(data.url)
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Could not start Google Drive connection')
-      setConnectingDrive(false)
-    }
-  }
-
-  const disconnectDrive = async () => {
-    const approved = await confirm({ title: 'Disconnect Google Drive?', message: 'Uploads will stop working until Drive is connected again. Existing files in Google Drive will not be deleted.', confirmLabel: 'Disconnect' })
-    if (!approved) return
-    try {
-      await api.delete('/auth/google/connect')
-      await dispatch(fetchProfile()).unwrap()
-      toast.success('Google Drive disconnected')
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Could not disconnect Google Drive')
-    }
-  }
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmNewPassword) {
@@ -159,19 +119,13 @@ const SettingsPage = () => {
               </button>
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-dark-700 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <HiCloud className={`text-2xl ${user?.googleConnected ? 'text-green-500' : 'text-primary-500'}`} />
+                  <HiCloud className="text-2xl text-green-500" />
                   <div>
-                    <p className="text-sm font-medium text-dark-800 dark:text-dark-100">Google Drive</p>
-                    <p className="text-xs text-dark-400">{user?.googleConnected ? 'Connected — uploads are saved to your Drive' : 'Connect Drive to enable uploads'}</p>
+                    <p className="text-sm font-medium text-dark-800 dark:text-dark-100">AirDrive Cloud Storage</p>
+                    <p className="text-xs text-dark-400">Connected — files are stored privately in Supabase Storage</p>
                   </div>
                 </div>
-                {user?.googleConnected ? (
-                  <button onClick={disconnectDrive} className="btn-secondary text-sm text-red-500">Disconnect</button>
-                ) : (
-                  <button onClick={connectDrive} disabled={connectingDrive} className="btn-primary text-sm whitespace-nowrap">
-                    {connectingDrive ? 'Connecting...' : 'Connect Drive'}
-                  </button>
-                )}
+                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">Ready</span>
               </div>
             </div>
           )}

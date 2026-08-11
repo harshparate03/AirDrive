@@ -5,6 +5,7 @@ const upload = require('../middleware/upload');
 const FileRequest = require('../models/FileRequest');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
+const storageService = require('../services/supabaseStorage');
 const { v4: uuidv4 } = require('uuid');
 
 // POST /api/file-requests — create request
@@ -80,16 +81,24 @@ router.post('/:token/upload', upload.array('files', 20), async (req, res) => {
       if (disallowed) return res.status(400).json({ error: `File type ${disallowed.mimetype} is not allowed` });
     }
 
-    // Get owner's tokens
     const User = require('../models/User');
     const owner = await User.findById(request.userId);
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
-    if (!owner.googleConnected || !owner.googleAccessToken || !owner.googleRefreshToken) {
-      return res.status(409).json({ error: 'The request owner must connect Google Drive before receiving files' });
+    storageService.assertConfigured();
+    const incomingSize = req.files.reduce((sum, file) => sum + file.size, 0);
+    const [storedFiles, storedRequests] = await Promise.all([
+      require('../models/File').find({ storageType: 'supabase' }).select('size versions.size').lean(),
+      FileRequest.find({ 'uploads.r2Key': { $exists: true } }).select('uploads.size uploads.r2Key').lean(),
+    ]);
+    const filesUsed = storedFiles.reduce((sum, item) => sum + (item.versions?.length
+      ? item.versions.reduce((versionSum, version) => versionSum + (version.size || 0), 0)
+      : (item.size || 0)), 0);
+    const requestsUsed = storedRequests.reduce((sum, item) => sum + item.uploads
+      .filter(upload => upload.r2Key).reduce((uploadSum, upload) => uploadSum + (upload.size || 0), 0), 0);
+    const r2Limit = Number(process.env.SUPABASE_STORAGE_LIMIT_BYTES) || 900000000;
+    if (filesUsed + requestsUsed + incomingSize > r2Limit) {
+      return res.status(413).json({ error: 'AirDrive cloud storage capacity exceeded' });
     }
-
-    const accessToken = decrypt(owner.googleAccessToken);
-    const refreshToken = decrypt(owner.googleRefreshToken);
 
     const uploaded = [];
     try {
@@ -99,24 +108,21 @@ router.post('/:token/upload', upload.array('files', 20), async (req, res) => {
       if (request.folderId && !destination) return res.status(404).json({ error: 'Destination folder no longer exists' });
 
       for (const file of req.files) {
-        const driveFile = await driveService.uploadFile(accessToken, refreshToken, {
-          name: file.originalname,
-          mimeType: file.mimetype,
-          buffer: file.buffer,
-          folderId: destination?.googleFolderId || null,
-        });
+        const extension = require('path').extname(file.originalname).toLowerCase();
+        const r2Key = `${owner._id}/requests/${uuidv4()}${extension}`;
+        await storageService.uploadBuffer({ key: r2Key, buffer: file.buffer, mimeType: file.mimetype });
 
         const uploadRecord = {
           name: file.originalname,
           size: file.size,
           mimeType: file.mimetype,
-          googleFileId: driveFile.id,
+          r2Key,
           uploaderEmail: req.body.email || 'anonymous',
         };
         uploaded.push(uploadRecord);
       }
     } catch (uploadError) {
-      await Promise.allSettled(uploaded.map(item => driveService.deleteFile(accessToken, refreshToken, item.googleFileId)));
+      await Promise.allSettled(uploaded.map(item => storageService.deleteObject(item.r2Key)));
       throw uploadError;
     }
 
@@ -124,6 +130,7 @@ router.post('/:token/upload', upload.array('files', 20), async (req, res) => {
 
     request.accessCount += 1;
     await request.save();
+    await User.findByIdAndUpdate(owner._id, { $inc: { storageUsed: uploaded.reduce((sum, item) => sum + item.size, 0) } });
 
     // Notify owner
     const { createNotification } = require('../utils/activityLogger');

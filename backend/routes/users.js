@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Activity = require('../models/Activity');
 const { decrypt } = require('../utils/encryption');
 const driveService = require('../services/googleDrive');
+const storageService = require('../services/supabaseStorage');
 
 // GET /api/users/profile
 router.get('/profile', authenticate, async (req, res) => {
@@ -12,17 +13,7 @@ router.get('/profile', authenticate, async (req, res) => {
     const user = await User.findById(req.user._id).select('-googleAccessToken -googleRefreshToken -refreshToken');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Get storage from Google Drive (optional - fall back to local if not connected)
-    let storageInfo = {};
-    if (user.googleConnected && user.googleAccessToken) {
-      try {
-        const { accessToken, refreshToken } = {
-          accessToken: decrypt(user.googleAccessToken),
-          refreshToken: decrypt(user.googleRefreshToken),
-        };
-        storageInfo = await driveService.getStorageQuota(accessToken, refreshToken);
-      } catch (_) {}
-    }
+    const storageInfo = { usage: user.storageUsed || 0, limit: Number(process.env.SUPABASE_STORAGE_LIMIT_BYTES) || 900000000, source: 'supabase' };
 
     res.json({ user, storageInfo });
   } catch (error) {
@@ -117,7 +108,9 @@ router.delete('/account', authenticate, async (req, res) => {
     const accessToken = account?.googleAccessToken ? decrypt(account.googleAccessToken) : '';
     const refreshToken = account?.googleRefreshToken ? decrypt(account.googleRefreshToken) : '';
     for (const file of files) {
-      if (file.storageType === 'google' && file.googleFileId && accessToken) {
+      if (file.storageType === 'supabase' && file.r2Key) {
+        await storageService.deleteFileObjects(file);
+      } else if (file.storageType === 'google' && file.googleFileId && accessToken) {
         await driveService.deleteFile(accessToken, refreshToken, file.googleFileId);
       } else if (file.localPath) {
         await require('../services/localStorage').deleteFile(file.localPath);

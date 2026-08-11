@@ -11,7 +11,7 @@ const STEPS = [
   {
     icon: HiCloudUpload,
     title: 'Welcome to Air Drive! 🎉',
-    body: 'Your AI-powered cloud storage. All your files are stored securely in your own Google Drive — we never store them on our servers.',
+    body: 'Your AI-powered cloud storage. Files are stored privately in AirDrive cloud storage and remain available across sessions.',
     color: 'from-primary-500 to-purple-600',
   },
   {
@@ -29,7 +29,7 @@ const STEPS = [
   {
     icon: HiShare,
     title: 'Easy Sharing',
-    body: 'Share files with password protection, expiry dates, and QR codes. Create File Request links so others can upload directly to your Drive.',
+    body: 'Share files with password protection, expiry dates, and QR codes. Create File Request links so others can upload directly to your AirDrive storage.',
     color: 'from-rose-500 to-pink-500',
   },
   {
