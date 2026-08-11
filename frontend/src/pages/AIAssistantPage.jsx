@@ -44,6 +44,30 @@ const Message = ({ msg }) => (
   </motion.div>
 )
 
+const ContextFileCard = ({ files = [], selectedFile, onSelect, onUpload, title = 'Select a file to analyze' }) => (
+  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-dark-700 dark:bg-dark-800/60">
+    <div className="mb-3 flex items-center gap-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300"><HiDocument /></div>
+      <div>
+        <h3 className="text-sm font-semibold text-dark-800 dark:text-white">{title}</h3>
+        <p className="text-xs text-dark-400">Choose an existing file or upload a new one.</p>
+      </div>
+    </div>
+    <div className="flex flex-col gap-2 sm:flex-row">
+      <select
+        value={selectedFile?._id || ''}
+        onChange={event => onSelect(files.find(file => file._id === event.target.value) || null)}
+        className="input min-w-0 flex-1 text-sm"
+      >
+        <option value="">Select a file...</option>
+        {files.map(file => <option key={file._id} value={file._id}>{file.name}</option>)}
+      </select>
+      <button type="button" onClick={onUpload} className="btn-secondary flex items-center justify-center gap-2 whitespace-nowrap text-sm"><HiUpload /> Upload file</button>
+    </div>
+    {selectedFile && <div className="mt-3 flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs text-dark-600 shadow-sm dark:bg-dark-700 dark:text-dark-200"><HiCheckCircle className="flex-shrink-0 text-green-500" /><span className="truncate">Ready: {selectedFile.name}</span></div>}
+  </div>
+)
+
 const AIAssistantPage = () => {
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
@@ -143,11 +167,16 @@ const AIAssistantPage = () => {
       const uploadedFile = event.detail?.file
       if (!uploadedFile) return
       setSelectedFile(uploadedFile)
-      setActiveFeature('chat')
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `${uploadedFile.name} is uploaded and selected. Ask me a question about this file.`,
-      }])
+      const feature = event.detail?.feature || 'chat'
+      setActiveFeature(feature)
+      if (feature === 'chat') {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `${uploadedFile.name} is uploaded and selected. Ask me a question about this file.`,
+        }])
+      } else {
+        toast.success(`${uploadedFile.name} is ready to analyze`)
+      }
       queryClient.invalidateQueries({ queryKey: ['files-for-ai'] })
     }
     window.addEventListener('airdrive:ai-context-uploaded', handleContextUpload)
@@ -320,10 +349,7 @@ const AIAssistantPage = () => {
                   <HiPaperAirplane className="rotate-90" />
                 </button>
               </div>
-              <p className="text-xs text-dark-400 mt-1.5">
-                {attachmentUploading ? 'Uploading and attaching your file... ' : selectedFile ? `Questions will use ${selectedFile.name} as context. ` : 'Use + to upload a file, or select a context file. '}
-                Press Enter to send, Shift+Enter for new line.
-              </p>
+              {attachmentUploading && <p className="mt-1.5 text-xs text-primary-500">Uploading and attaching your file...</p>}
             </div>
           </>
         )}
@@ -367,7 +393,13 @@ const AIAssistantPage = () => {
 
         {activeFeature === 'summary' && (
           <div className="p-4 sm:p-6 space-y-5 flex-1 overflow-y-auto">
-            <p className="text-sm text-dark-600 dark:text-dark-300">Choose a document from Context File, then select how AirDrive should analyze it.</p>
+            <ContextFileCard
+              files={filesData?.files || []}
+              selectedFile={selectedFile}
+              onSelect={setSelectedFile}
+              onUpload={() => dispatch(openModal({ modal: 'upload', data: { selectForAI: true, aiFeature: 'summary' } }))}
+              title="Document to summarize"
+            />
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 ['summary', 'Summary'], ['important', 'Key points'], ['explain', 'Explain simply'], ['notes', 'Study notes'],
@@ -394,10 +426,16 @@ const AIAssistantPage = () => {
 
         {/* Tags, Rename, Duplicates, Folders */}
         {['tags', 'rename', 'duplicates', 'folders'].includes(activeFeature) && (
-          <div className="p-6 space-y-4 flex-1">
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
             {activeFeature === 'tags' && (
               <div className="space-y-3">
-                <p className="text-sm text-dark-600 dark:text-dark-300">Select a file from the left to generate AI tags, or generate for all files.</p>
+                <ContextFileCard
+                  files={filesData?.files || []}
+                  selectedFile={selectedFile}
+                  onSelect={setSelectedFile}
+                  onUpload={() => dispatch(openModal({ modal: 'upload', data: { selectForAI: true, aiFeature: 'tags' } }))}
+                  title="File to tag"
+                />
                 <button
                   onClick={() => selectedFile && tagsMutation.mutate(selectedFile._id)}
                   disabled={!selectedFile || tagsMutation.isPending}
@@ -414,7 +452,13 @@ const AIAssistantPage = () => {
             )}
             {activeFeature === 'rename' && (
               <div className="space-y-3">
-                <p className="text-sm text-dark-600 dark:text-dark-300">Select a file and let AI suggest a better filename.</p>
+                <ContextFileCard
+                  files={filesData?.files || []}
+                  selectedFile={selectedFile}
+                  onSelect={setSelectedFile}
+                  onUpload={() => dispatch(openModal({ modal: 'upload', data: { selectForAI: true, aiFeature: 'rename' } }))}
+                  title="File to rename"
+                />
                 <button
                   onClick={() => selectedFile && renameMutation.mutate(selectedFile._id)}
                   disabled={!selectedFile || renameMutation.isPending}

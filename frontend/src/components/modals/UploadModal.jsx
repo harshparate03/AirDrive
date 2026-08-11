@@ -42,7 +42,7 @@ const UploadModal = () => {
     setDone(true)
     if (modalData?.selectForAI && uploadedFiles?.length) {
       window.dispatchEvent(new CustomEvent('airdrive:ai-context-uploaded', {
-        detail: { file: uploadedFiles[0], count: uploadedFiles.length },
+        detail: { file: uploadedFiles[0], count: uploadedFiles.length, feature: modalData.aiFeature || 'chat' },
       }))
     }
     setTimeout(() => dispatch(closeModal()), 1200)
