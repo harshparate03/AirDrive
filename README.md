@@ -39,7 +39,9 @@ npm run dev         # http://localhost:5173
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend-only Supabase secret key |
 | `SUPABASE_STORAGE_BUCKET` | Private Storage bucket name |
 | `SUPABASE_STORAGE_LIMIT_BYTES` | Application-enforced global storage cap |
-| `OPENAI_API_KEY` | OpenAI or OpenRouter API key |
+| `GROQ_API_KEY` | Groq API key (preferred when set) |
+| `GROQ_MODEL` | Groq model ID; defaults to `llama-3.1-8b-instant` |
+| `OPENAI_API_KEY` | Optional OpenAI or OpenRouter API key |
 | `ENCRYPTION_KEY` | 32-char AES key for token encryption |
 
 ### Frontend `.env`

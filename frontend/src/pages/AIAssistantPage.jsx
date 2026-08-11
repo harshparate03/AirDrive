@@ -221,8 +221,8 @@ const AIAssistantPage = () => {
             <HiUpload /> Upload a context file
           </button>
           <div className={`mt-3 rounded-xl border px-3 py-2 text-xs ${aiStatus?.configured ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300'}`}>
-            <p className="font-semibold">{aiStatus?.configured ? 'AI provider connected' : 'Local fallback mode'}</p>
-            <p className="mt-0.5 opacity-80">{aiStatus?.configured ? `Model: ${aiStatus.model}` : 'Core document tools work locally. Add a valid API key for full chat intelligence.'}</p>
+            <p className="font-semibold">{aiStatus?.configured ? `${aiStatus.provider === 'groq' ? 'Groq' : 'OpenAI'} connected` : 'Local fallback mode'}</p>
+            <p className="mt-0.5 opacity-80">{aiStatus?.configured ? `Model: ${aiStatus.model}` : 'Core document tools work locally. Add a valid Groq or OpenAI API key for full chat intelligence.'}</p>
           </div>
         </div>
       </div>
@@ -241,7 +241,7 @@ const AIAssistantPage = () => {
             {selectedFile && <p className="text-xs text-dark-400">Analyzing: {selectedFile.name}</p>}
           </div>
           <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold ${aiStatus?.configured ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>
-            {aiStatus?.configured ? 'AI online' : 'Local mode'}
+            {aiStatus?.configured ? `${aiStatus.provider === 'groq' ? 'Groq' : 'AI'} online` : 'Local mode'}
           </span>
         </div>
 
