@@ -3,11 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   HiSparkles, HiPaperAirplane, HiDocument, HiTag, HiSearch,
-  HiDuplicate, HiFolder, HiLightningBolt, HiUpload, HiCheckCircle,
+  HiDuplicate, HiFolder, HiLightningBolt, HiUpload, HiCheckCircle, HiPlus, HiX,
 } from 'react-icons/hi'
 import { useDispatch } from 'react-redux'
 import { openModal } from '../store/slices/uiSlice'
 import api from '../services/api'
+import useUpload from '../hooks/useUpload'
 import toast from 'react-hot-toast'
 
 const AI_FEATURES = [
@@ -56,7 +57,10 @@ const AIAssistantPage = () => {
   const [smartResults, setSmartResults] = useState(null)
   const [summaryType, setSummaryType] = useState('summary')
   const [folderSuggestions, setFolderSuggestions] = useState([])
+  const [attachmentUploading, setAttachmentUploading] = useState(false)
   const messagesEndRef = useRef(null)
+  const chatFileRef = useRef(null)
+  const { upload } = useUpload()
 
   const { data: filesData } = useQuery({
     queryKey: ['files-for-ai'],
@@ -166,6 +170,22 @@ const AIAssistantPage = () => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
+  const handleChatFile = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setAttachmentUploading(true)
+    const uploadedFiles = await upload([file])
+    setAttachmentUploading(false)
+    const uploadedFile = uploadedFiles?.[0]
+    if (!uploadedFile) return
+    setSelectedFile(uploadedFile)
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `${uploadedFile.name} is attached. You can now ask anything about this file.`,
+    }])
+  }
+
   return (
     <div className="min-h-[calc(100vh-140px)] lg:h-[calc(100vh-140px)] flex flex-col lg:flex-row gap-4 animate-fade-in">
       {/* Left: Feature panel */}
@@ -265,7 +285,25 @@ const AIAssistantPage = () => {
               <div ref={messagesEndRef} />
             </div>
             <div className="p-4 border-t border-slate-100 dark:border-dark-700">
+              {selectedFile && (
+                <div className="mb-2 flex w-fit max-w-full items-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-700 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-300">
+                  <HiDocument className="flex-shrink-0" />
+                  <span className="truncate">{selectedFile.name}</span>
+                  <button type="button" onClick={() => setSelectedFile(null)} className="rounded p-0.5 hover:bg-primary-100 dark:hover:bg-primary-900/40" aria-label="Remove attached file"><HiX /></button>
+                </div>
+              )}
               <div className="flex gap-3">
+                <input ref={chatFileRef} type="file" className="hidden" onChange={handleChatFile} />
+                <button
+                  type="button"
+                  onClick={() => chatFileRef.current?.click()}
+                  disabled={attachmentUploading || chatMutation.isPending}
+                  className="btn-secondary self-end px-3"
+                  aria-label="Upload and attach a file"
+                  title="Upload and attach a file"
+                >
+                  {attachmentUploading ? <span className="block h-4 w-4 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" /> : <HiPlus className="text-lg" />}
+                </button>
                 <textarea
                   value={input}
                   onChange={e => setInput(e.target.value)}
@@ -276,14 +314,14 @@ const AIAssistantPage = () => {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || chatMutation.isPending}
+                  disabled={!input.trim() || chatMutation.isPending || attachmentUploading}
                   className="btn-primary px-4 self-end"
                 >
                   <HiPaperAirplane className="rotate-90" />
                 </button>
               </div>
               <p className="text-xs text-dark-400 mt-1.5">
-                {selectedFile ? `Questions will use ${selectedFile.name} as context. ` : 'Upload or select a context file to ask about its contents. '}
+                {attachmentUploading ? 'Uploading and attaching your file... ' : selectedFile ? `Questions will use ${selectedFile.name} as context. ` : 'Use + to upload a file, or select a context file. '}
                 Press Enter to send, Shift+Enter for new line.
               </p>
             </div>
