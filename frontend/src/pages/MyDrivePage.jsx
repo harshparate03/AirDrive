@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,19 +13,21 @@ import CreateFolderModal from '../components/modals/CreateFolderModal'
 import UploadDropzone from '../components/upload/UploadDropzone'
 import Breadcrumb from '../components/ui/Breadcrumb'
 import FileToolbar from '../components/files/FileToolbar'
-import { openModal } from '../store/slices/uiSlice'
+import { clearSelection, openModal } from '../store/slices/uiSlice'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton'
 import ViewModeToggle from '../components/ui/ViewModeToggle'
 
 const MyDrivePage = () => {
   const dispatch = useDispatch()
   const queryClient = useQueryClient()
-  const { viewMode, selectedFiles } = useSelector(state => state.ui)
+  const { viewMode } = useSelector(state => state.ui)
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [sortBy, setSortBy] = useState('createdAt')
   const [sortOrder, setSortOrder] = useState('desc')
   const [filterType, setFilterType] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
+
+  useEffect(() => () => dispatch(clearSelection()), [dispatch])
 
   const { data: folderData, isLoading: foldersLoading } = useQuery({
     queryKey: ['folders', null],
@@ -83,7 +85,7 @@ const MyDrivePage = () => {
         </div>
 
         {/* Toolbar */}
-        {selectedFiles.length > 0 && <FileToolbar onRefresh={handleRefresh} />}
+        {!isLoading && files.length > 0 && <FileToolbar files={files} onRefresh={handleRefresh} />}
 
         {/* Sort & Filter */}
         <div className="flex items-center gap-3 overflow-x-auto pb-1 text-sm">

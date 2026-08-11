@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -18,16 +18,29 @@ const ContextMenu = () => {
   const { contextMenu } = useSelector(state => state.ui)
   const menuRef = useRef(null)
   const [suggestedName, setSuggestedName] = useState('')
+  const [position, setPosition] = useState({ left: 8, top: 8 })
   const confirm = useConfirm()
 
   if (!contextMenu) return null
 
   const { x, y, file, folder, type } = contextMenu
 
-  // Clamp position to viewport
-  const menuW = 200, menuH = 340
-  const left = Math.min(x, window.innerWidth - menuW - 8)
-  const top = Math.min(y, window.innerHeight - menuH - 8)
+  const menuWidth = 240
+
+  useLayoutEffect(() => {
+    const placeMenu = () => {
+      const margin = 8
+      const rect = menuRef.current?.getBoundingClientRect()
+      const width = rect?.width || menuWidth
+      const height = rect?.height || 0
+      const left = Math.max(margin, Math.min(x, window.innerWidth - width - margin))
+      const top = Math.max(margin, Math.min(y, window.innerHeight - height - margin))
+      setPosition(current => current.left === left && current.top === top ? current : { left, top })
+    }
+    placeMenu()
+    window.addEventListener('resize', placeMenu)
+    return () => window.removeEventListener('resize', placeMenu)
+  }, [x, y, suggestedName])
 
   const close = () => dispatch(setContextMenu(null))
 
@@ -178,8 +191,8 @@ const aiRename = useMutation({
   return (
     <div
       ref={menuRef}
-      style={{ position: 'fixed', left, top, zIndex: 9999, minWidth: menuW + 40 }}
-      className="bg-white dark:bg-dark-800 rounded-xl shadow-glass-lg border border-slate-100 dark:border-dark-700 py-1.5 overflow-hidden"
+      style={{ position: 'fixed', left: position.left, top: position.top, zIndex: 9999, width: menuWidth, maxHeight: 'calc(100dvh - 16px)' }}
+      className="overflow-y-auto overscroll-contain rounded-xl border border-slate-100 bg-white py-1.5 shadow-glass-lg dark:border-dark-700 dark:bg-dark-800"
       onClick={e => e.stopPropagation()}
     >
       {suggestedName && (
@@ -217,7 +230,7 @@ const aiRename = useMutation({
             disabled={item.loading}
             className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left disabled:opacity-60
               ${item.danger
-                ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
+                ? 'sticky bottom-0 z-10 border-t border-red-100 bg-white text-red-500 shadow-[0_-6px_12px_-10px_rgba(0,0,0,0.5)] hover:bg-red-50 dark:border-red-900/40 dark:bg-dark-800 dark:hover:bg-red-900/20'
                 : item.dim
                   ? 'text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20'
                   : 'text-dark-700 dark:text-dark-200 hover:bg-slate-50 dark:hover:bg-dark-700'

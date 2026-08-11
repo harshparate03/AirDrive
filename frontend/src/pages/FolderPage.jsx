@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
@@ -12,8 +12,9 @@ import UploadDropzone from '../components/upload/UploadDropzone'
 import Breadcrumb from '../components/ui/Breadcrumb'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton'
 import ViewModeToggle from '../components/ui/ViewModeToggle'
+import FileToolbar from '../components/files/FileToolbar'
 import { useDispatch } from 'react-redux'
-import { openModal } from '../store/slices/uiSlice'
+import { clearSelection, openModal } from '../store/slices/uiSlice'
 
 const FolderPage = () => {
   const { folderId } = useParams()
@@ -22,6 +23,11 @@ const FolderPage = () => {
   const queryClient = useQueryClient()
   const { viewMode } = useSelector(state => state.ui)
   const [showCreateFolder, setShowCreateFolder] = useState(false)
+
+  useEffect(() => {
+    dispatch(clearSelection())
+    return () => dispatch(clearSelection())
+  }, [dispatch, folderId])
 
   const { data, isLoading } = useQuery({
     queryKey: ['folder-contents', folderId],
@@ -72,6 +78,8 @@ const FolderPage = () => {
             </button>
           </div>
         </div>
+
+        {!isLoading && files.length > 0 && <FileToolbar files={files} onRefresh={handleRefresh} />}
 
         {isLoading && <LoadingSkeleton count={8} />}
 

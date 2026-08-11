@@ -7,6 +7,7 @@ import FileGrid from '../components/files/FileGrid'
 import FileList from '../components/files/FileList'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton'
 import ViewModeToggle from '../components/ui/ViewModeToggle'
+import FileToolbar from '../components/files/FileToolbar'
 
 const StarredPage = () => {
   const { viewMode } = useSelector(state => state.ui)
@@ -27,6 +28,7 @@ return (
         <ViewModeToggle />
       </div>
       {isLoading && <LoadingSkeleton count={6} />}
+      {!isLoading && files.length > 0 && <FileToolbar files={files} onRefresh={handleRefresh} />}
       {!isLoading && files.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-20 h-20 rounded-3xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mb-4">

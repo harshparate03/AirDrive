@@ -6,6 +6,7 @@ import FileGrid from '../components/files/FileGrid'
 import FileList from '../components/files/FileList'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton'
 import ViewModeToggle from '../components/ui/ViewModeToggle'
+import FileToolbar from '../components/files/FileToolbar'
 
 const RecentPage = () => {
   const { viewMode } = useSelector(state => state.ui)
@@ -17,6 +18,7 @@ const RecentPage = () => {
   })
 
   const files = data?.files || []
+  const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['recent'] })
 
 return (
     <div className="space-y-4 animate-fade-in">
@@ -25,10 +27,11 @@ return (
         <ViewModeToggle />
       </div>
       {isLoading && <LoadingSkeleton count={8} />}
+      {!isLoading && files.length > 0 && <FileToolbar files={files} onRefresh={handleRefresh} />}
       {!isLoading && files.length > 0 && (
         viewMode === 'grid'
-          ? <FileGrid files={files} onRefresh={() => queryClient.invalidateQueries(['recent'])} />
-          : <FileList files={files} onRefresh={() => queryClient.invalidateQueries(['recent'])} />
+          ? <FileGrid files={files} onRefresh={handleRefresh} />
+          : <FileList files={files} onRefresh={handleRefresh} />
       )}
     </div>
   )

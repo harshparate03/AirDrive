@@ -1,6 +1,6 @@
 import React from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { HiSearch } from 'react-icons/hi'
 import api from '../services/api'
 import { useSelector } from 'react-redux'
@@ -8,11 +8,13 @@ import FileGrid from '../components/files/FileGrid'
 import FileList from '../components/files/FileList'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton'
 import ViewModeToggle from '../components/ui/ViewModeToggle'
+import FileToolbar from '../components/files/FileToolbar'
 
 const SearchPage = () => {
   const [searchParams] = useSearchParams()
   const q = searchParams.get('q') || ''
   const { viewMode } = useSelector(state => state.ui)
+  const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
     queryKey: ['search', q],
@@ -21,6 +23,7 @@ const SearchPage = () => {
   })
 
   const files = data?.files || []
+  const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['search', q] })
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -45,9 +48,10 @@ const SearchPage = () => {
       {!isLoading && files.length > 0 && (
         <div>
           <p className="text-sm text-dark-400 mb-3">{files.length} file(s) found</p>
+          <div className="mb-3"><FileToolbar files={files} onRefresh={handleRefresh} /></div>
           {viewMode === 'grid'
-            ? <FileGrid files={files} onRefresh={() => {}} />
-            : <FileList files={files} onRefresh={() => {}} />
+            ? <FileGrid files={files} onRefresh={handleRefresh} />
+            : <FileList files={files} onRefresh={handleRefresh} />
           }
         </div>
       )}
