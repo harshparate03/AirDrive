@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   HiSparkles, HiPaperAirplane, HiDocument, HiTag, HiSearch,
-  HiDuplicate, HiFolder, HiLightningBolt, HiUpload, HiCheckCircle, HiPlus, HiX,
+  HiDuplicate, HiFolder, HiLightningBolt, HiUpload, HiCheckCircle, HiPlus, HiX, HiMicrophone,
 } from 'react-icons/hi'
 import { useDispatch } from 'react-redux'
 import { openModal } from '../store/slices/uiSlice'
@@ -93,18 +93,15 @@ const AIAssistantPage = () => {
   const [summaryType, setSummaryType] = useState('summary')
   const [folderSuggestions, setFolderSuggestions] = useState([])
   const [attachmentUploading, setAttachmentUploading] = useState(false)
+  const [isListening, setIsListening] = useState(false)
   const messagesEndRef = useRef(null)
   const chatFileRef = useRef(null)
+  const recognitionRef = useRef(null)
   const { upload } = useUpload()
 
   const { data: filesData } = useQuery({
     queryKey: ['files-for-ai'],
     queryFn: () => api.get('/files').then(r => r.data),
-  })
-
-  const { data: aiStatus } = useQuery({
-    queryKey: ['ai-status'],
-    queryFn: () => api.get('/ai/status').then(r => r.data),
   })
 
   const chatMutation = useMutation({
@@ -173,6 +170,8 @@ const AIAssistantPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  useEffect(() => () => recognitionRef.current?.stop(), [])
+
   useEffect(() => {
     const handleContextUpload = (event) => {
       const uploadedFile = event.detail?.file
@@ -226,6 +225,35 @@ const AIAssistantPage = () => {
     }])
   }
 
+  const toggleMicrophone = () => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      toast.error('Voice input is not supported in this browser')
+      return
+    }
+    const recognition = new SpeechRecognition()
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.lang = navigator.language || 'en-US'
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results).map(result => result[0].transcript).join(' ').trim()
+      if (transcript) setInput(previous => `${previous}${previous.trim() ? ' ' : ''}${transcript}`)
+    }
+    recognition.onend = () => setIsListening(false)
+    recognition.onerror = (event) => {
+      setIsListening(false)
+      if (event.error !== 'aborted') toast.error(event.error === 'not-allowed' ? 'Microphone permission was denied' : 'Voice input could not start')
+    }
+    recognitionRef.current = recognition
+    setIsListening(true)
+    recognition.start()
+  }
+
   return (
     <div className="min-h-[calc(100vh-140px)] lg:h-[calc(100vh-140px)] flex flex-col lg:flex-row gap-4 animate-fade-in">
       {/* Left: Feature panel */}
@@ -257,34 +285,6 @@ const AIAssistantPage = () => {
         ))}
         </div>
 
-        {/* File selector */}
-        <div className="mt-2 lg:mt-4 pt-3 lg:pt-4 border-t border-slate-100 dark:border-dark-800">
-          <p className="text-xs font-medium text-dark-500 mb-2">Context File</p>
-          <select
-            value={selectedFile?._id || ''}
-            onChange={e => {
-              const file = filesData?.files?.find(f => f._id === e.target.value)
-              setSelectedFile(file || null)
-            }}
-            className="input text-xs py-2"
-          >
-            <option value="">No file selected</option>
-            {filesData?.files?.map(f => (
-              <option key={f._id} value={f._id}>{f.name.substring(0, 40)}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => dispatch(openModal({ modal: 'upload', data: { selectForAI: true } }))}
-            className="btn-secondary mt-2 flex w-full items-center justify-center gap-2 text-xs"
-          >
-            <HiUpload /> Upload a context file
-          </button>
-          <div className={`mt-3 rounded-xl border px-3 py-2 text-xs ${aiStatus?.configured ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300'}`}>
-            <p className="font-semibold">{aiStatus?.configured ? `${aiStatus.provider === 'groq' ? 'Groq' : 'OpenAI'} connected` : 'Local fallback mode'}</p>
-            <p className="mt-0.5 opacity-80">{aiStatus?.configured ? `Model: ${aiStatus.model}` : 'Core document tools work locally. Add a valid Groq or OpenAI API key for full chat intelligence.'}</p>
-          </div>
-        </div>
       </div>
 
       {/* Right: Main panel */}
@@ -300,9 +300,6 @@ const AIAssistantPage = () => {
             </h2>
             {selectedFile && <p className="text-xs text-dark-400">Analyzing: {selectedFile.name}</p>}
           </div>
-          <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold ${aiStatus?.configured ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>
-            {aiStatus?.configured ? `${aiStatus.provider === 'groq' ? 'Groq' : 'AI'} online` : 'Local mode'}
-          </span>
         </div>
 
         {/* Chat view */}
@@ -352,6 +349,17 @@ const AIAssistantPage = () => {
                   rows={2}
                   className="min-h-10 max-h-32 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm text-dark-800 outline-none placeholder:text-dark-400 dark:text-dark-100"
                 />
+                <button
+                  type="button"
+                  onClick={toggleMicrophone}
+                  disabled={attachmentUploading || chatMutation.isPending}
+                  className={`relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition disabled:cursor-not-allowed disabled:opacity-50 ${isListening ? 'bg-red-50 text-red-600 ring-2 ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900/50' : 'text-dark-500 hover:bg-slate-100 hover:text-primary-600 dark:text-dark-300 dark:hover:bg-dark-700 dark:hover:text-primary-400'}`}
+                  aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+                  title={isListening ? 'Listening… click to stop' : 'Use microphone'}
+                >
+                  {isListening && <span className="absolute inset-1 animate-ping rounded-lg bg-red-300/30" />}
+                  <HiMicrophone className="relative text-lg" />
+                </button>
                 <button
                   onClick={handleSend}
                   disabled={!input.trim() || chatMutation.isPending || attachmentUploading}
