@@ -141,6 +141,8 @@ const SettingsPage = () => {
     staleTime: 30_000,
   })
 
+  const photoAbortRef = useRef(null)
+
   /* ── Photo handlers ── */
   const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0]
@@ -155,10 +157,15 @@ const SettingsPage = () => {
       setPhoto(base64)
       dispatch(setUser({ ...userRef.current, photo: base64 }))
       setPhotoLoading(true)
+      // Cancel any previous in-flight photo request
+      if (photoAbortRef.current) photoAbortRef.current.abort()
+      const controller = new AbortController()
+      photoAbortRef.current = controller
       try {
-        await api.patch('/users/profile', { photo: base64 })
+        await api.patch('/users/profile', { photo: base64 }, { signal: controller.signal })
         toast.success('Profile photo updated')
-      } catch {
+      } catch (err) {
+        if (err?.code === 'ERR_CANCELED' || err?.name === 'AbortError' || err?.name === 'CanceledError') return
         setPhoto(prev)
         dispatch(setUser({ ...userRef.current, photo: prev }))
         toast.error('Failed to update photo')
@@ -171,6 +178,8 @@ const SettingsPage = () => {
 
   const handleRemovePhoto = async () => {
     if (!window.confirm('Remove your profile photo?')) return
+    // Cancel any in-flight photo upload first
+    if (photoAbortRef.current) { photoAbortRef.current.abort(); photoAbortRef.current = null }
     const prev = userRef.current?.photo || ''
     setPhoto('')
     dispatch(setUser({ ...userRef.current, photo: '' }))
@@ -189,12 +198,9 @@ const SettingsPage = () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
     try {
-      // Send BOTH name and current photo state so server always has the correct photo
       const res = await api.patch('/users/profile', { name: name.trim(), photo: photo })
       const serverUser = res.data?.user
-      if (serverUser) {
-        dispatch(setUser({ ...serverUser, photo: photo }))
-      }
+      if (serverUser) dispatch(setUser({ ...serverUser, photo: photo }))
       toast.success('Profile updated')
     } catch { toast.error('Failed to update') }
     setSaving(false)
