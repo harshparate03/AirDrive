@@ -4,6 +4,7 @@ const { authenticate } = require('../middleware/auth');
 const User = require('../models/User');
 const Activity = require('../models/Activity');
 const { decrypt } = require('../utils/encryption');
+const { applyProfileUpdate } = require('../utils/profileUpdate');
 const driveService = require('../services/googleDrive');
 const storageService = require('../services/supabaseStorage');
 const { getStorageLimit } = require('../services/storageQuota');
@@ -25,33 +26,18 @@ router.get('/profile', authenticate, async (req, res) => {
 // PATCH /api/users/profile - Update profile
 router.patch('/profile', authenticate, async (req, res) => {
   try {
-    const { name, photo, preferences } = req.body;
-    const update = { $set: {} };
+    const { name, photo, preferences, removePhoto } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (name) update.$set.name = name;
-    // photo === '' clears it, any other string sets it
-    if (typeof photo === 'string') update.$set.photo = photo;
-
-    console.log('Profile update - userId:', req.user._id, 'photo type:', typeof photo, 'photo length:', (photo||'').length, 'setting photo:', typeof photo === 'string');
-
-    if (preferences) {
-      const existing = await require('../models/User').findById(req.user._id).select('preferences').lean();
-      const merged = { ...((existing?.preferences || {})), ...preferences };
-      update.$set.preferences = merged;
-    }
-
-    if (Object.keys(update.$set).length === 0) {
+    const changed = applyProfileUpdate(user, { name, photo, preferences, removePhoto });
+    if (!changed) {
       return res.status(400).json({ error: 'Nothing to update' });
     }
 
-    const user = await require('../models/User').findByIdAndUpdate(
-      req.user._id,
-      update,
-      { new: true, runValidators: false }
-    );
+    user.updatedAt = new Date();
+    await user.save();
 
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    console.log('Profile updated - photo in DB now:', (user.photo||'').length, 'chars');
     res.json({ user: user.toPublic() });
   } catch (error) {
     console.error('Profile update error:', error.message);

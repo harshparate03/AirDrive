@@ -186,12 +186,10 @@ const authSlice = createSlice({
         state.user = null
         state.isAuthenticated = false
       })
-      // updateProfile — merge only non-photo fields to avoid overwriting local photo state
+      // updateProfile — trust server response (including cleared photo)
       .addCase(updateProfile.fulfilled, (state, action) => {
         if (action.payload && typeof action.payload === 'object') {
-          // Keep current photo in Redux — photo is managed by its own handlers
-          const currentPhoto = state.user?.photo ?? ''
-          state.user = { ...action.payload, photo: currentPhoto, _updatedAt: Date.now() }
+          state.user = { ...action.payload, photo: action.payload.photo ?? '', _updatedAt: Date.now() }
         }
       })
   },

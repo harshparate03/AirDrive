@@ -19,8 +19,12 @@ export const AdminProfile = () => {
   const save = async () => {
     if (!name.trim()) return toast.error('Display name is required')
     setSaving(true)
+    const trimmedPhoto = photo.trim()
     try {
-      await dispatch(updateProfile({ name: name.trim(), photo: photo.trim() })).unwrap()
+      await dispatch(updateProfile({
+        name: name.trim(),
+        ...(trimmedPhoto === '' ? { removePhoto: true, photo: '' } : { photo: trimmedPhoto }),
+      })).unwrap()
       toast.success('Admin profile updated')
     } catch (error) { toast.error(error || 'Profile update failed') }
     setSaving(false)

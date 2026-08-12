@@ -168,6 +168,10 @@ const SettingsPage = () => {
 
   const handleRemovePhoto = () => {
     if (!window.confirm('Remove your profile photo?')) return
+    if (photoAbortRef.current) {
+      photoAbortRef.current.abort()
+      photoAbortRef.current = null
+    }
     photoRef.current = ''
     setPhoto('')
     dispatch(setUser({ ...userRef.current, photo: '' }))
@@ -178,15 +182,21 @@ const SettingsPage = () => {
   const saveProfile = async () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
-    // Use photoRef.current — always the latest value, never stale
-    const currentPhoto = photoRef.current
+    const currentPhoto = photoRef.current ?? ''
+    const payload = {
+      name: name.trim(),
+      ...(currentPhoto === '' ? { removePhoto: true, photo: '' } : { photo: currentPhoto }),
+    }
     try {
-      const res = await api.patch('/users/profile', { name: name.trim(), photo: currentPhoto })
+      const res = await api.patch('/users/profile', payload)
       const serverUser = res.data?.user
+      const savedPhoto = serverUser?.photo ?? ''
+      photoRef.current = savedPhoto
+      setPhoto(savedPhoto)
       if (serverUser) {
-        dispatch(setUser({ ...serverUser, photo: currentPhoto }))
-        setPhoto(currentPhoto)
+        dispatch(setUser({ ...serverUser, photo: savedPhoto }))
       }
+      await dispatch(fetchProfile()).unwrap().catch(() => {})
       toast.success('Profile updated')
     } catch (err) {
       toast.error('Failed to update: ' + (err?.response?.data?.error || err?.message || 'server error'))
@@ -367,7 +377,17 @@ const SettingsPage = () => {
                         : 'Save Changes'
                       }
                     </button>
-                    <button onClick={() => { setName(user?.name || '') }} className="btn-secondary text-sm">Reset</button>
+                    <button
+                      onClick={() => {
+                        setName(user?.name || '')
+                        const savedPhoto = user?.photo || ''
+                        photoRef.current = savedPhoto
+                        setPhoto(savedPhoto)
+                      }}
+                      className="btn-secondary text-sm"
+                    >
+                      Reset
+                    </button>
                   </div>
 
                   {/* Info strip */}
