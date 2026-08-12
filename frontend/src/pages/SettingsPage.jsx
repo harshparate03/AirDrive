@@ -9,7 +9,7 @@ import {
   HiColorSwatch, HiViewGrid, HiViewList, HiSparkles,
   HiUpload, HiCamera,
 } from 'react-icons/hi'
-import { updateProfile, logoutUser } from '../store/slices/authSlice'
+import { updateProfile, setUser } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
 import toast from 'react-hot-toast'
 import api from '../services/api'
@@ -140,7 +140,8 @@ const SettingsPage = () => {
       setPhotoLoading(true)
       try {
         const res = await api.patch('/users/profile', { photo: base64 })
-        dispatch(updateProfile(res.data.user))
+        // Update Redux store directly with the returned user object
+        dispatch(setUser(res.data.user))
         setPhoto(base64)
         toast.success('Profile photo updated')
       } catch {
@@ -157,7 +158,8 @@ const SettingsPage = () => {
     setPhotoLoading(true)
     try {
       const res = await api.patch('/users/profile', { photo: '' })
-      dispatch(updateProfile(res.data.user))
+      // Update Redux store directly with the returned user object
+      dispatch(setUser(res.data.user))
       setPhoto('')
       toast.success('Profile photo removed')
     } catch {
