@@ -11,12 +11,12 @@ const { getStorageLimit } = require('../services/storageQuota');
 // GET /api/users/profile
 router.get('/profile', authenticate, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-googleAccessToken -googleRefreshToken -refreshToken');
+    const user = await User.findById(req.user._id).select('-googleAccessToken -googleRefreshToken -refreshToken -password');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const storageInfo = { usage: user.storageUsed || 0, limit: Math.min(user.storageLimit || getStorageLimit(), getStorageLimit()), source: 'supabase' };
 
-    res.json({ user, storageInfo });
+    res.json({ user: user.toPublic(), storageInfo });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch profile' });
   }

@@ -179,12 +179,10 @@ const SettingsPage = () => {
     const currentUser = userRef.current
     const previousPhoto = currentUser?.photo || ''
     setPhotoLoading(true)
-    // Instant clear — settings page + TopBar + Sidebar
     setPhoto('')
     dispatch(setUser(Object.assign({}, currentUser, { photo: '' })))
     try {
       const res = await api.patch('/users/profile', { photo: '' })
-      // Use server response directly — don't re-fetch
       const serverUser = res.data?.user
       if (serverUser) {
         dispatch(setUser(serverUser))
@@ -192,7 +190,6 @@ const SettingsPage = () => {
       }
       toast.success('Profile photo removed')
     } catch (err) {
-      // Revert optimistic update on failure
       setPhoto(previousPhoto)
       dispatch(setUser(Object.assign({}, currentUser, { photo: previousPhoto })))
       toast.error('Failed to remove photo: ' + (err?.response?.data?.error || err?.message || 'Unknown error'))
