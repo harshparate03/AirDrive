@@ -122,6 +122,17 @@ const AIAssistantPage = () => {
     onError: (error) => showApiError(error, 'Tag generation failed'),
   })
 
+  const removeTagsMutation = useMutation({
+    mutationFn: (tag) => api.delete('/ai/tags', { data: { fileId: selectedFile._id, tag: tag || undefined } }),
+    onSuccess: (res) => {
+      setSelectedFile(prev => prev ? { ...prev, aiTags: res.data.tags || [] } : prev)
+      queryClient.invalidateQueries({ queryKey: ['files'] })
+      queryClient.invalidateQueries({ queryKey: ['files-for-ai'] })
+      toast.success(res.data.tags?.length ? 'AI tag removed' : 'AI tags removed')
+    },
+    onError: (error) => showApiError(error, 'Could not remove AI tag'),
+  })
+
   const summaryMutation = useMutation({
     mutationFn: ({ fileId, type }) => api.post('/ai/summary', { fileId, type }),
     onError: (error) => showApiError(error, 'Document summary failed'),
@@ -463,8 +474,9 @@ const AIAssistantPage = () => {
                   <HiTag /> {tagsMutation.isPending ? 'Generating...' : 'Generate Tags'}
                 </button>
                 {selectedFile?.aiTags?.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {selectedFile.aiTags.map(tag => <span key={tag} className="rounded-full bg-primary-50 dark:bg-primary-900/30 px-3 py-1 text-xs text-primary-700 dark:text-primary-300">{tag}</span>)}
+                  <div className="rounded-xl border border-slate-200 p-3 dark:border-dark-700">
+                    <div className="mb-2 flex items-center justify-between gap-3"><p className="text-xs font-medium text-dark-500">Generated tags</p><button type="button" onClick={() => removeTagsMutation.mutate(null)} disabled={removeTagsMutation.isPending} className="text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50">Remove all</button></div>
+                    <div className="flex flex-wrap gap-2">{selectedFile.aiTags.map(tag => <span key={tag} className="flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"><span>{tag}</span><button type="button" onClick={() => removeTagsMutation.mutate(tag)} disabled={removeTagsMutation.isPending} className="rounded-full p-0.5 hover:bg-primary-100 disabled:opacity-50 dark:hover:bg-primary-900/50" aria-label={`Remove ${tag} tag`}><HiX /></button></span>)}</div>
                   </div>
                 )}
               </div>

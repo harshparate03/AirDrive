@@ -251,6 +251,36 @@ let tags = [];
   }
 });
 
+// DELETE /api/ai/tags - Remove one AI tag or every AI tag from a file
+router.delete('/tags', authenticate, async (req, res) => {
+  try {
+    const { fileId, tag } = req.body;
+    if (!fileId) return res.status(400).json({ error: 'File ID required' });
+
+    const file = await File.findOne({ _id: fileId, userId: req.user._id });
+    if (!file) return res.status(404).json({ error: 'File not found' });
+
+    const previousTags = Array.isArray(file.aiTags) ? file.aiTags : [];
+    file.aiTags = tag
+      ? previousTags.filter(existingTag => existingTag !== tag)
+      : [];
+    await file.save();
+
+    await logActivityFn({
+      userId: req.user._id,
+      action: 'ai_tag',
+      fileId: file._id,
+      details: tag ? `Removed AI tag: ${tag}` : `Removed all ${previousTags.length} AI tags`,
+      ...getClientInfoFn(req),
+    });
+
+    res.json({ tags: file.aiTags, file });
+  } catch (error) {
+    console.error('AI tag removal error:', error.message);
+    res.status(500).json({ error: 'AI tag removal failed', details: error.message });
+  }
+});
+
 // POST /api/ai/rename - AI suggest rename
 router.post('/rename', authenticate, async (req, res) => {
   const start = Date.now();
