@@ -113,7 +113,6 @@ const SettingsPage = () => {
   const [photo, setPhoto]     = useState(user?.photo || '')
   const [photoLoading, setPhotoLoading] = useState(false)
   const photoInputRef         = useRef(null)
-  // Always-fresh ref so async handlers never use stale user
   const userRef               = useRef(user)
   useEffect(() => { userRef.current = user }, [user])
 
@@ -121,6 +120,11 @@ const SettingsPage = () => {
   useEffect(() => {
     setName(user?.name || '')
   }, [user?.name])
+
+  // Sync photo when Redux user updates (e.g. after server confirms)
+  useEffect(() => {
+    setPhoto(user?.photo || '')
+  }, [user?.photo])
 
   // Password
   const [curPwd,  setCurPwd]  = useState('')
@@ -152,20 +156,17 @@ const SettingsPage = () => {
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const base64 = ev.target.result
-      const currentUser = userRef.current
-      const previousPhoto = currentUser?.photo || ''
-      // Instant update — settings page + TopBar + Sidebar
+      const prev = userRef.current?.photo || ''
+      // Show new photo immediately everywhere
       setPhoto(base64)
-      dispatch(setUser(Object.assign({}, currentUser, { photo: base64 })))
+      dispatch(setUser({ ...userRef.current, photo: base64 }))
       setPhotoLoading(true)
       try {
         await api.patch('/users/profile', { photo: base64 })
-        await dispatch(fetchProfile()).unwrap()
-        setPhoto(userRef.current?.photo || base64)
         toast.success('Profile photo updated')
       } catch {
-        setPhoto(previousPhoto)
-        dispatch(setUser(Object.assign({}, currentUser, { photo: previousPhoto })))
+        setPhoto(prev)
+        dispatch(setUser({ ...userRef.current, photo: prev }))
         toast.error('Failed to update photo')
       }
       setPhotoLoading(false)
@@ -176,26 +177,21 @@ const SettingsPage = () => {
 
   const handleRemovePhoto = async () => {
     if (!window.confirm('Remove your profile photo?')) return
-    const currentUser = userRef.current
-    const previousPhoto = currentUser?.photo || ''
-    // Clear photo FIRST so default avatar shows immediately (no spinner yet)
+    const prev = userRef.current?.photo || ''
+    // 1. Instantly clear photo state — avatar switches to default immediately
     setPhoto('')
-    dispatch(setUser(Object.assign({}, currentUser, { photo: '' })))
-    setPhotoLoading(true)
+    // 2. Instantly update Redux — TopBar + Sidebar switch to default immediately  
+    dispatch(setUser({ ...userRef.current, photo: '' }))
     try {
-      const res = await api.patch('/users/profile', { photo: '' })
-      const serverUser = res.data?.user
-      if (serverUser) {
-        dispatch(setUser(serverUser))
-        setPhoto(serverUser.photo || '')
-      }
+      // 3. Save to server in background
+      await api.patch('/users/profile', { photo: '' })
       toast.success('Profile photo removed')
     } catch (err) {
-      setPhoto(previousPhoto)
-      dispatch(setUser(Object.assign({}, currentUser, { photo: previousPhoto })))
-      toast.error('Failed to remove photo: ' + (err?.response?.data?.error || err?.message || 'Unknown error'))
+      // 4. Only revert if server call failed
+      setPhoto(prev)
+      dispatch(setUser({ ...userRef.current, photo: prev }))
+      toast.error('Failed to remove photo')
     }
-    setPhotoLoading(false)
   }
 
   /* ── Profile save ── */
@@ -300,13 +296,13 @@ const SettingsPage = () => {
                   <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
                     {/* Avatar with gradient border */}
                     <div className="relative flex-shrink-0">
-                      {photoLoading ? (
-                        <div style={{ width: 100, height: 100 }}
-                          className="rounded-2xl bg-slate-100 dark:bg-dark-700 flex items-center justify-center shadow-lg ring-4 ring-white dark:ring-dark-700">
-                          <div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" />
+                      {/* Always show avatar — spinner overlays on top during upload */}
+                      <UserAvatar src={photo} name={user?.name} size={96} />
+                      {photoLoading && (
+                        <div style={{ width: 101, height: 101 }}
+                          className="absolute inset-0 rounded-2xl bg-black/30 flex items-center justify-center">
+                          <div className="w-7 h-7 border-[3px] border-white border-t-transparent rounded-full animate-spin" />
                         </div>
-                      ) : (
-                        <UserAvatar src={photo} name={user?.name} size={96} />
                       )}
                       {/* Camera button */}
                       <button
