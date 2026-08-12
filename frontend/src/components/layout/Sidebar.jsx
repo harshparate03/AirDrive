@@ -17,7 +17,7 @@ import { DefaultAvatar } from './ProfileMenu'
 
 /* Avatar with gradient border — works for photo & initials */
 const SidebarAvatar = ({ user, size = 32 }) => {
-  if (user?.photo) {
+  if (user?.photo?.trim()) {
     return (
       <div
         style={{ width: size + 4, height: size + 4 }}

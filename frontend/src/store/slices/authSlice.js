@@ -186,11 +186,11 @@ const authSlice = createSlice({
         state.user = null
         state.isAuthenticated = false
       })
-      // updateProfile — also handles direct { user } object passed from photo upload
+      // updateProfile — server always returns the full updated user via toPublic()
       .addCase(updateProfile.fulfilled, (state, action) => {
-        // action.payload can be a full user object OR partial fields
         if (action.payload && typeof action.payload === 'object') {
-          state.user = { ...state.user, ...action.payload }
+          // Replace user entirely with the server-returned object so no stale fields remain
+          state.user = { ...action.payload }
         }
       })
   },

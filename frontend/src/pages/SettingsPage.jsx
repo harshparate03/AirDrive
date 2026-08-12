@@ -9,7 +9,7 @@ import {
   HiColorSwatch, HiViewGrid, HiViewList, HiSparkles,
   HiUpload, HiCamera,
 } from 'react-icons/hi'
-import { updateProfile, setUser } from '../store/slices/authSlice'
+import { updateProfile } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
 import toast from 'react-hot-toast'
 import api from '../services/api'
@@ -153,14 +153,17 @@ const SettingsPage = () => {
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const base64 = ev.target.result
+      // Optimistically show preview immediately
+      setPhoto(base64)
       setPhotoLoading(true)
       try {
-        const res = await api.patch('/users/profile', { photo: base64 })
-        // Update Redux store directly with the returned user object
-        dispatch(setUser(res.data.user))
-        setPhoto(base64)
+        const updatedUser = await dispatch(updateProfile({ photo: base64 })).unwrap()
+        // Sync local state to whatever the server returned (could be URL or base64)
+        setPhoto(updatedUser?.photo || '')
         toast.success('Profile photo updated')
       } catch {
+        // Revert on failure
+        setPhoto(user?.photo || '')
         toast.error('Failed to update photo')
       }
       setPhotoLoading(false)
@@ -175,8 +178,7 @@ const SettingsPage = () => {
     // Optimistically clear photo immediately so default avatar shows right away
     setPhoto('')
     try {
-      const res = await api.patch('/users/profile', { photo: '' })
-      dispatch(setUser(res.data.user))
+      await dispatch(updateProfile({ photo: '' })).unwrap()
       toast.success('Profile photo removed')
     } catch {
       // Revert on failure

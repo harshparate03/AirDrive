@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { HiBadgeCheck, HiBell, HiPhotograph, HiSave, HiShieldCheck, HiUser } from 'react-icons/hi'
 import toast from 'react-hot-toast'
@@ -11,6 +11,10 @@ export const AdminProfile = () => {
   const [name, setName] = useState(user?.name || '')
   const [photo, setPhoto] = useState(user?.photo || '')
   const [saving, setSaving] = useState(false)
+
+  // Keep local state in sync when Redux user updates
+  useEffect(() => { setName(user?.name || '') }, [user?.name])
+  useEffect(() => { setPhoto(user?.photo || '') }, [user?.photo])
 
   const save = async () => {
     if (!name.trim()) return toast.error('Display name is required')
