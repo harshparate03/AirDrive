@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDispatch, useSelector } from 'react-redux'
-import { HiX, HiUpload, HiFolderOpen, HiDocument, HiCheck } from 'react-icons/hi'
+import { HiX, HiUpload, HiFolderOpen, HiDocument, HiCheck, HiPhotograph, HiVideoCamera, HiArchive } from 'react-icons/hi'
 import { closeModal } from '../../store/slices/uiSlice'
 import useUpload from '../../hooks/useUpload'
 
@@ -17,6 +17,9 @@ const UploadModal = () => {
   const [done, setDone] = useState(false)
   const [batchStartIndex, setBatchStartIndex] = useState(null)
   const fileRef = useRef(null)
+  const imageRef = useRef(null)
+  const videoRef = useRef(null)
+  const archiveRef = useRef(null)
   const folderRef = useRef(null)
 
   const handleFiles = (files) => {
@@ -111,18 +114,19 @@ const UploadModal = () => {
             </motion.div>
           </div>
 
-          {/* Folder upload */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 border-t border-slate-100 dark:border-dark-700" />
-            <span className="text-xs text-dark-400">or</span>
-            <div className="flex-1 border-t border-slate-100 dark:border-dark-700" />
+          {/* Upload type shortcuts */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark-400">Choose upload type</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <button type="button" onClick={() => imageRef.current?.click()} className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-200 p-3 text-xs font-medium text-dark-600 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800"><HiPhotograph className="text-xl text-emerald-500" /> Images</button>
+              <button type="button" onClick={() => videoRef.current?.click()} className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-200 p-3 text-xs font-medium text-dark-600 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800"><HiVideoCamera className="text-xl text-purple-500" /> Videos</button>
+              <button type="button" onClick={() => archiveRef.current?.click()} className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-200 p-3 text-xs font-medium text-dark-600 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800"><HiArchive className="text-xl text-amber-500" /> ZIP files</button>
+              <button type="button" onClick={() => folderRef.current?.click()} className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-200 p-3 text-xs font-medium text-dark-600 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800"><HiFolderOpen className="text-xl text-blue-500" /> Folder</button>
+            </div>
           </div>
-          <button
-            onClick={() => folderRef.current?.click()}
-            className="w-full btn-secondary flex items-center justify-center gap-2 text-sm"
-          >
-            <HiFolderOpen /> Upload Folder
-          </button>
+          <input ref={imageRef} type="file" multiple accept="image/*" className="hidden" onChange={e => handleFiles(e.target.files)} />
+          <input ref={videoRef} type="file" multiple accept="video/*" className="hidden" onChange={e => handleFiles(e.target.files)} />
+          <input ref={archiveRef} type="file" multiple accept=".zip,.rar,.7z,.tar,.gz,application/zip,application/x-zip-compressed" className="hidden" onChange={e => handleFiles(e.target.files)} />
           <input
             ref={folderRef}
             type="file"
