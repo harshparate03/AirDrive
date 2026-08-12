@@ -70,6 +70,7 @@ const useUpload = (folderId = null) => {
     queryClient.invalidateQueries({ queryKey: ['recent'] })
     queryClient.invalidateQueries({ queryKey: ['userStats'] })
     queryClient.invalidateQueries({ queryKey: ['files-for-ai'] })
+    if (folderId) queryClient.invalidateQueries({ queryKey: ['folder-contents', folderId] })
 
     if (successCount > 0) {
       toast.success(`${successCount} file${successCount > 1 ? 's' : ''} uploaded successfully`)
