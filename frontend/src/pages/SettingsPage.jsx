@@ -189,9 +189,12 @@ const SettingsPage = () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
     try {
-      // Only save name — photo is saved immediately by its own handlers
-      const updatedUser = await dispatch(updateProfile({ name: name.trim() })).unwrap()
-      if (updatedUser) dispatch(setUser({ ...updatedUser, photo: photo }))
+      // Send BOTH name and current photo state so server always has the correct photo
+      const res = await api.patch('/users/profile', { name: name.trim(), photo: photo })
+      const serverUser = res.data?.user
+      if (serverUser) {
+        dispatch(setUser({ ...serverUser, photo: photo }))
+      }
       toast.success('Profile updated')
     } catch { toast.error('Failed to update') }
     setSaving(false)

@@ -29,16 +29,17 @@ router.patch('/profile', authenticate, async (req, res) => {
     const update = { $set: {} };
 
     if (name) update.$set.name = name;
-
-    // photo: '' means remove, any other string means set
-    if (photo !== undefined) {
-      update.$set.photo = photo; // empty string clears it
-    }
+    // photo === '' clears it, any other string sets it
+    if (typeof photo === 'string') update.$set.photo = photo;
 
     if (preferences) {
       const existing = await require('../models/User').findById(req.user._id).select('preferences').lean();
       const merged = { ...((existing?.preferences || {})), ...preferences };
       update.$set.preferences = merged;
+    }
+
+    if (Object.keys(update.$set).length === 0) {
+      return res.status(400).json({ error: 'Nothing to update' });
     }
 
     const user = await require('../models/User').findByIdAndUpdate(
