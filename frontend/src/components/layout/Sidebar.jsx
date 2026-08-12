@@ -26,6 +26,7 @@ const SidebarAvatar = ({ user, size = 32 }) => {
         <img
           src={user.photo}
           alt={user?.name || 'User'}
+          key={user.photo}
           style={{ width: size, height: size }}
           className="rounded-full object-cover block w-full h-full"
         />

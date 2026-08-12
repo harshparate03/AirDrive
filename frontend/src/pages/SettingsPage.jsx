@@ -9,7 +9,7 @@ import {
   HiColorSwatch, HiViewGrid, HiViewList, HiSparkles,
   HiUpload, HiCamera,
 } from 'react-icons/hi'
-import { updateProfile, setUser } from '../store/slices/authSlice'
+import { updateProfile, setUser, fetchProfile } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
 import toast from 'react-hot-toast'
 import api from '../services/api'
@@ -154,19 +154,14 @@ const SettingsPage = () => {
     reader.onload = async (ev) => {
       const base64 = ev.target.result
       const previousPhoto = user?.photo || ''
-      // Immediately show new photo in settings page + TopBar/Sidebar
       setPhoto(base64)
       dispatch(setUser({ ...user, photo: base64 }))
       setPhotoLoading(true)
       try {
         await api.patch('/users/profile', { photo: base64 })
-        // Fetch fresh user to sync everything
-        const res = await api.get('/users/profile')
-        dispatch(setUser(res.data.user))
-        setPhoto(res.data.user?.photo || base64)
+        await dispatch(fetchProfile()).unwrap()
         toast.success('Profile photo updated')
       } catch {
-        // Revert on failure
         setPhoto(previousPhoto)
         dispatch(setUser({ ...user, photo: previousPhoto }))
         toast.error('Failed to update photo')
@@ -179,21 +174,17 @@ const SettingsPage = () => {
 
   const handleRemovePhoto = async () => {
     if (!window.confirm('Remove your profile photo?')) return
-    setPhotoLoading(true)
-    // Capture old photo for revert
     const previousPhoto = user?.photo || ''
-    // Immediately clear in Redux + local state — TopBar/Sidebar update right away
-    const clearedUser = { ...user, photo: '' }
+    setPhotoLoading(true)
+    // Immediately clear everywhere — Redux + local state
     setPhoto('')
-    dispatch(setUser(clearedUser))
+    dispatch(setUser({ ...user, photo: '' }))
     try {
       await api.patch('/users/profile', { photo: '' })
-      // Fetch fresh user from server to ensure full sync
-      const res = await api.get('/users/profile')
-      dispatch(setUser(res.data.user))
+      // Force fresh fetch so all components get the clean server state
+      await dispatch(fetchProfile()).unwrap()
       toast.success('Profile photo removed')
     } catch {
-      // Revert on failure
       setPhoto(previousPhoto)
       dispatch(setUser({ ...user, photo: previousPhoto }))
       toast.error('Failed to remove photo')

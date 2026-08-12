@@ -60,6 +60,7 @@ const UserAvatar = ({ user, size = 36, className = '' }) => {
         <img
           src={user.photo}
           alt={user.name || 'User'}
+          key={user.photo}
           style={{ width: size, height: size }}
           className="rounded-full object-cover w-full h-full block"
         />
