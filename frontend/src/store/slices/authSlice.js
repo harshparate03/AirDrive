@@ -186,9 +186,12 @@ const authSlice = createSlice({
         state.user = null
         state.isAuthenticated = false
       })
-      // updateProfile
+      // updateProfile — also handles direct { user } object passed from photo upload
       .addCase(updateProfile.fulfilled, (state, action) => {
-        state.user = action.payload
+        // action.payload can be a full user object OR partial fields
+        if (action.payload && typeof action.payload === 'object') {
+          state.user = { ...state.user, ...action.payload }
+        }
       })
   },
 })

@@ -30,12 +30,9 @@ router.patch('/profile', authenticate, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (name) user.name = name;
-    if (photo) user.photo = photo;
+    if (photo !== undefined) user.photo = photo; // base64 or URL or empty string
     if (preferences) {
-      user.preferences = { ...user.preferences, ...preferences };
-      if (preferences.notifications) {
-        user.preferences.notifications = { ...user.preferences.notifications, ...preferences.notifications };
-      }
+      user.preferences = { ...user.preferences.toObject?.() || user.preferences, ...preferences };
     }
 
     await user.save();

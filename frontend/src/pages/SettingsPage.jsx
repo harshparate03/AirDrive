@@ -1,11 +1,13 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   HiUser, HiMoon, HiSun, HiShieldCheck, HiTrash, HiBell,
   HiLockClosed, HiEye, HiEyeOff, HiRefresh, HiClock,
-  HiChevronRight, HiCheckCircle, HiLogout, HiPhotograph,
+  HiChevronRight, HiCheckCircle, HiPhotograph, HiX,
   HiColorSwatch, HiViewGrid, HiViewList, HiSparkles,
+  HiUpload, HiCamera,
 } from 'react-icons/hi'
 import { updateProfile, logoutUser } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
@@ -14,13 +16,13 @@ import api from '../services/api'
 import { useQuery } from '@tanstack/react-query'
 import ActivityHeatmap from '../components/charts/ActivityHeatmap'
 import ThemePicker from '../components/ui/ThemePicker'
-import { useNavigate } from 'react-router-dom'
+import { DefaultAvatar } from '../components/layout/ProfileMenu'
 
-/* ── helpers ───────────────────────────────────────── */
+/* ─── helpers ───────────────────────────────────── */
 const ACTION_BADGE = {
   upload:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   download: 'bg-blue-100   text-blue-700    dark:bg-blue-900/30    dark:text-blue-400',
-  delete:   'bg-red-100    text-red-700     dark:bg-red-900/30     dark:text-red-400',
+  delete:   'bg-red-100    text-red-600     dark:bg-red-900/30     dark:text-red-400',
   trash:    'bg-red-100    text-red-600     dark:bg-red-900/30     dark:text-red-400',
   share:    'bg-purple-100 text-purple-700  dark:bg-purple-900/30  dark:text-purple-400',
   login:    'bg-amber-100  text-amber-700   dark:bg-amber-900/30   dark:text-amber-400',
@@ -30,49 +32,46 @@ const ACTION_BADGE = {
   default:  'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
 }
 
-const SectionCard = ({ title, subtitle, children }) => (
-  <div className="space-y-5">
-    <div className="pb-3 border-b border-slate-100 dark:border-dark-700">
-      <h2 className="text-base font-bold text-dark-900 dark:text-white">{title}</h2>
-      {subtitle && <p className="text-xs text-dark-400 mt-0.5">{subtitle}</p>}
+const Toggle = ({ label, description, defaultChecked = true }) => (
+  <div className="flex items-start sm:items-center justify-between gap-4 py-3.5
+    border-b border-slate-100 dark:border-dark-700 last:border-0">
+    <div className="min-w-0">
+      <p className="text-sm font-medium text-dark-800 dark:text-dark-100">{label}</p>
+      {description && <p className="text-xs text-dark-400 mt-0.5 leading-relaxed">{description}</p>}
     </div>
-    {children}
-  </div>
-)
-
-const FieldRow = ({ label, hint, children }) => (
-  <div className="space-y-1.5">
-    <label className="block text-sm font-medium text-dark-700 dark:text-dark-200">{label}</label>
-    {hint && <p className="text-xs text-dark-400">{hint}</p>}
-    {children}
-  </div>
-)
-
-const Toggle = ({ checked, onChange, label, description }) => (
-  <div className="flex items-center justify-between gap-4 py-3 border-b border-slate-50 dark:border-dark-800 last:border-0">
-    <div>
-      <p className="text-sm font-medium text-dark-700 dark:text-dark-200">{label}</p>
-      {description && <p className="text-xs text-dark-400 mt-0.5">{description}</p>}
-    </div>
-    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-      <input type="checkbox" defaultChecked={checked} onChange={onChange} className="sr-only peer" />
-      <div className="w-11 h-6 rounded-full bg-slate-200 dark:bg-dark-600 peer-checked:bg-primary-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5" />
+    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5 sm:mt-0">
+      <input type="checkbox" defaultChecked={defaultChecked} className="sr-only peer" />
+      <div className="w-11 h-6 rounded-full bg-slate-200 dark:bg-dark-600
+        peer-checked:bg-primary-500 transition-colors duration-200
+        after:content-[''] after:absolute after:top-0.5 after:left-0.5
+        after:bg-white after:rounded-full after:h-5 after:w-5
+        after:transition-all peer-checked:after:translate-x-5 after:shadow-sm" />
     </label>
   </div>
 )
 
-/* ── main component ────────────────────────────────── */
+/* ─── main ───────────────────────────────────────── */
 const SettingsPage = () => {
-  const dispatch  = useDispatch()
-  const navigate  = useNavigate()
-  const { user }  = useSelector(s => s.auth)
-  const { theme } = useSelector(s => s.ui)
+  const dispatch    = useDispatch()
+  const location    = useLocation()
+  const { user }    = useSelector(s => s.auth)
+  const { theme }   = useSelector(s => s.ui)
 
-  const [activeSection, setActiveSection] = useState('profile')
+  // default section from navigation state (e.g. from ProfileMenu)
+  const [activeSection, setActiveSection] = useState(
+    location.state?.section || 'profile'
+  )
 
   // Profile
   const [name, setName]       = useState(user?.name || '')
   const [saving, setSaving]   = useState(false)
+  const [photo, setPhoto]     = useState(user?.photo || '')
+  const [photoLoading, setPhotoLoading] = useState(false)
+  const photoInputRef         = useRef(null)
+
+  // Sync photo when user updates
+  useEffect(() => { setPhoto(user?.photo || '') }, [user?.photo])
+  useEffect(() => { setName(user?.name || '') },   [user?.name])
 
   // Password
   const [curPwd,  setCurPwd]  = useState('')
@@ -81,7 +80,7 @@ const SettingsPage = () => {
   const [showPwd, setShowPwd] = useState(false)
   const [chgPwd,  setChgPwd]  = useState(false)
 
-  // Activity query (lazy — only when tab active)
+  // Activity
   const {
     data: actData,
     isLoading: actLoading,
@@ -94,6 +93,46 @@ const SettingsPage = () => {
     staleTime: 30_000,
   })
 
+  /* ── Photo handlers ── */
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) return toast.error('Photo must be under 2MB')
+    if (!file.type.startsWith('image/')) return toast.error('Select an image file')
+
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result
+      setPhotoLoading(true)
+      try {
+        const res = await api.patch('/users/profile', { photo: base64 })
+        dispatch(updateProfile(res.data.user))
+        setPhoto(base64)
+        toast.success('Profile photo updated')
+      } catch {
+        toast.error('Failed to update photo')
+      }
+      setPhotoLoading(false)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const handleRemovePhoto = async () => {
+    if (!window.confirm('Remove your profile photo?')) return
+    setPhotoLoading(true)
+    try {
+      const res = await api.patch('/users/profile', { photo: '' })
+      dispatch(updateProfile(res.data.user))
+      setPhoto('')
+      toast.success('Profile photo removed')
+    } catch {
+      toast.error('Failed to remove photo')
+    }
+    setPhotoLoading(false)
+  }
+
+  /* ── Profile save ── */
   const saveProfile = async () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
@@ -104,21 +143,23 @@ const SettingsPage = () => {
     setSaving(false)
   }
 
+  /* ── Password change ── */
   const changePassword = async () => {
-    if (!curPwd || !newPwd || !cnfPwd)      return toast.error('Fill in all password fields')
-    if (newPwd.length < 6)                  return toast.error('New password must be ≥ 6 characters')
-    if (newPwd !== cnfPwd)                  return toast.error('Passwords do not match')
+    if (!curPwd || !newPwd || !cnfPwd) return toast.error('Fill all password fields')
+    if (newPwd.length < 6)             return toast.error('New password must be ≥ 6 characters')
+    if (newPwd !== cnfPwd)             return toast.error('Passwords do not match')
     setChgPwd(true)
     try {
       await api.post('/auth/change-password', { currentPassword: curPwd, newPassword: newPwd })
-      toast.success('Password changed successfully')
+      toast.success('Password changed')
       setCurPwd(''); setNewPwd(''); setCnfPwd('')
-    } catch (e) { toast.error(e.response?.data?.error || 'Failed to change password') }
+    } catch (e) { toast.error(e.response?.data?.error || 'Failed') }
     setChgPwd(false)
   }
 
+  /* ── Delete account ── */
   const deleteAccount = async () => {
-    if (!window.confirm('Permanently delete your account and all data? This cannot be undone.')) return
+    if (!window.confirm('Permanently delete your account? Cannot be undone.')) return
     try {
       await api.delete('/users/account')
       localStorage.clear()
@@ -126,11 +167,9 @@ const SettingsPage = () => {
     } catch { toast.error('Account deletion failed') }
   }
 
-  const handleLogout = async () => {
-    await dispatch(logoutUser())
-    navigate('/login')
-    toast.success('Logged out')
-  }
+  const strengthLevel = !newPwd.length ? 0 : newPwd.length < 6 ? 1 : newPwd.length < 10 ? 2 : 3
+  const strengthLabel = ['', 'Weak', 'Fair', 'Strong']
+  const strengthColor = ['', 'bg-red-500', 'bg-amber-500', 'bg-green-500']
 
   const sections = [
     { id: 'profile',       label: 'Profile',       icon: HiUser },
@@ -141,42 +180,33 @@ const SettingsPage = () => {
   ]
 
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in space-y-4">
+    <div className="max-w-4xl mx-auto animate-fade-in space-y-5 pb-20 md:pb-6">
       <h1 className="text-2xl font-bold text-dark-900 dark:text-white">Settings</h1>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col md:flex-row gap-4">
 
-        {/* ── Sidebar ── */}
-        <div className="sm:w-52 flex-shrink-0">
-          {/* Mobile: horizontal scroll tabs */}
-          <div className="flex sm:flex-col gap-1 overflow-x-auto pb-1 sm:pb-0 sm:overflow-visible">
+        {/* ── Sidebar tabs ── */}
+        <div className="md:w-52 flex-shrink-0">
+          {/* Mobile: horizontal scroll */}
+          <div className="flex md:flex-col gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
             {sections.map(s => (
               <button
                 key={s.id}
                 onClick={() => setActiveSection(s.id)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium
+                  whitespace-nowrap flex-shrink-0 transition-all duration-150 text-left
                   ${activeSection === s.id
-                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                    : 'text-dark-500 dark:text-dark-400 hover:bg-slate-100 dark:hover:bg-dark-800 hover:text-dark-700 dark:hover:text-dark-200'
+                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 shadow-sm'
+                    : 'text-dark-500 dark:text-dark-400 hover:bg-slate-100 dark:hover:bg-dark-800'
                   }`}
               >
                 <s.icon className={`text-lg flex-shrink-0 ${activeSection === s.id ? 'text-primary-500' : ''}`} />
-                <span className="sm:inline">{s.label}</span>
+                <span>{s.label}</span>
                 {activeSection === s.id && (
-                  <HiChevronRight className="ml-auto text-primary-400 hidden sm:block" />
+                  <HiChevronRight className="ml-auto text-primary-300 hidden md:block text-sm" />
                 )}
               </button>
             ))}
-
-            <div className="hidden sm:block mt-3 pt-3 border-t border-slate-100 dark:border-dark-800">
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 w-full transition-colors"
-              >
-                <HiLogout className="text-lg" />
-                Logout
-              </button>
-            </div>
           </div>
         </div>
 
@@ -185,89 +215,151 @@ const SettingsPage = () => {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSection}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.18 }}
-              className="card p-5 sm:p-6"
+              className="card p-5 sm:p-6 space-y-6"
             >
 
               {/* ━━━ PROFILE ━━━ */}
               {activeSection === 'profile' && (
-                <SectionCard title="Profile" subtitle="Manage your personal information">
-                  {/* Avatar + info */}
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-primary-50 to-purple-50 dark:from-primary-900/20 dark:to-purple-900/20 border border-primary-100 dark:border-primary-800/30">
-                    <div className="relative">
-                      <img
-                        src={user?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=6366f1&color=fff&size=80`}
-                        alt={user?.name}
-                        className="w-16 h-16 rounded-2xl ring-2 ring-white dark:ring-dark-700 shadow-md"
+                <>
+                  <div className="pb-4 border-b border-slate-100 dark:border-dark-700">
+                    <h2 className="text-base font-bold text-dark-900 dark:text-white">Profile</h2>
+                    <p className="text-xs text-dark-400 mt-0.5">Manage your name and profile photo</p>
+                  </div>
+
+                  {/* Photo upload */}
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0">
+                      <div className="w-24 h-24 rounded-2xl overflow-hidden ring-4 ring-white dark:ring-dark-700 shadow-lg">
+                        {photoLoading ? (
+                          <div className="w-full h-full bg-slate-100 dark:bg-dark-700 flex items-center justify-center">
+                            <div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        ) : photo ? (
+                          <img src={photo} alt={user?.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full">
+                            <DefaultAvatar name={user?.name || 'U'} size={96} />
+                          </div>
+                        )}
+                      </div>
+                      {/* Camera overlay button */}
+                      <button
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={photoLoading}
+                        className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full
+                          bg-primary-600 hover:bg-primary-700 text-white shadow-lg
+                          flex items-center justify-center transition-colors"
+                        title="Change photo"
+                      >
+                        <HiCamera className="text-sm" />
+                      </button>
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoSelect}
                       />
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-green-400 border-2 border-white dark:border-dark-800" title="Online" />
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-dark-900 dark:text-white text-base truncate">{user?.name}</p>
-                      <p className="text-sm text-dark-500 dark:text-dark-400 truncate">{user?.email}</p>
-                      <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-xs font-medium">
-                        <HiCheckCircle /> Air Drive Account
-                      </span>
+
+                    {/* Photo actions */}
+                    <div className="flex-1 min-w-0 text-center sm:text-left">
+                      <p className="font-bold text-dark-900 dark:text-white text-lg">{user?.name}</p>
+                      <p className="text-sm text-dark-500 dark:text-dark-400">{user?.email}</p>
+                      <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-3">
+                        <button
+                          onClick={() => photoInputRef.current?.click()}
+                          disabled={photoLoading}
+                          className="btn-secondary text-xs flex items-center gap-1.5 py-1.5"
+                        >
+                          <HiUpload className="text-sm" />
+                          {photo ? 'Change Photo' : 'Upload Photo'}
+                        </button>
+                        {photo && (
+                          <button
+                            onClick={handleRemovePhoto}
+                            disabled={photoLoading}
+                            className="btn-secondary text-xs text-red-500 flex items-center gap-1.5 py-1.5"
+                          >
+                            <HiX className="text-sm" /> Remove
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-dark-400 mt-2">JPG, PNG, GIF — max 2MB</p>
                     </div>
                   </div>
 
-                  {/* Name field */}
-                  <FieldRow label="Display Name">
+                  {/* Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-dark-700 dark:text-dark-200 mb-1.5">
+                      Display Name
+                    </label>
                     <input
                       value={name}
                       onChange={e => setName(e.target.value)}
                       className="input"
                       placeholder="Your display name"
                     />
-                  </FieldRow>
+                  </div>
 
                   {/* Email (read-only) */}
-                  <FieldRow label="Email Address" hint="Email cannot be changed">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-700 dark:text-dark-200 mb-1.5">
+                      Email Address
+                    </label>
                     <input
                       value={user?.email || ''}
                       readOnly
-                      className="input opacity-60 cursor-not-allowed select-all"
+                      className="input opacity-60 cursor-not-allowed"
                     />
-                  </FieldRow>
+                    <p className="text-xs text-dark-400 mt-1">Email cannot be changed</p>
+                  </div>
 
-                  <div className="flex items-center gap-3 pt-1">
+                  <div className="flex gap-3">
                     <button onClick={saveProfile} disabled={saving} className="btn-primary flex items-center gap-2">
                       {saving
-                        ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
+                        ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
                         : 'Save Changes'
                       }
                     </button>
-                    <button onClick={() => setName(user?.name || '')} className="btn-secondary text-sm">
-                      Reset
-                    </button>
+                    <button onClick={() => { setName(user?.name || '') }} className="btn-secondary text-sm">Reset</button>
                   </div>
 
-                  {/* Stats strip */}
+                  {/* Info strip */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
                     {[
-                      { label: 'Member since', value: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—' },
-                      { label: 'Last login',   value: user?.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : '—' },
-                      { label: 'Account role', value: user?.role || 'user' },
-                    ].map(s => (
-                      <div key={s.label} className="p-3 rounded-xl bg-slate-50 dark:bg-dark-800">
-                        <p className="text-xs text-dark-400">{s.label}</p>
-                        <p className="text-sm font-semibold text-dark-700 dark:text-dark-200 capitalize mt-0.5">{s.value}</p>
+                      { label: 'Member since', val: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—' },
+                      { label: 'Last login',   val: user?.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : '—' },
+                      { label: 'Role',         val: user?.role || 'user' },
+                    ].map(({ label, val }) => (
+                      <div key={label} className="p-3 rounded-xl bg-slate-50 dark:bg-dark-800">
+                        <p className="text-xs text-dark-400">{label}</p>
+                        <p className="text-sm font-semibold text-dark-700 dark:text-dark-200 capitalize mt-0.5">{val}</p>
                       </div>
                     ))}
                   </div>
-                </SectionCard>
+                </>
               )}
 
               {/* ━━━ APPEARANCE ━━━ */}
               {activeSection === 'appearance' && (
-                <SectionCard title="Appearance" subtitle="Customize how Air Drive looks">
-                  {/* Dark / Light */}
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-dark-800 flex items-center justify-between gap-4">
+                <>
+                  <div className="pb-4 border-b border-slate-100 dark:border-dark-700">
+                    <h2 className="text-base font-bold text-dark-900 dark:text-white">Appearance</h2>
+                    <p className="text-xs text-dark-400 mt-0.5">Customize how Air Drive looks</p>
+                  </div>
+
+                  {/* Dark/Light toggle */}
+                  <div className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-dark-800">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-dark-700' : 'bg-amber-100'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        theme === 'dark' ? 'bg-dark-700' : 'bg-amber-100'
+                      }`}>
                         {theme === 'dark'
                           ? <HiMoon className="text-xl text-primary-400" />
                           : <HiSun className="text-xl text-amber-500" />
@@ -275,17 +367,14 @@ const SettingsPage = () => {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-dark-800 dark:text-dark-100">
-                          {theme === 'dark' ? 'Dark Mode' : 'Light Mode'} Active
+                          {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
                         </p>
-                        <p className="text-xs text-dark-400">Click to toggle</p>
+                        <p className="text-xs text-dark-400">Current theme</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => dispatch(toggleTheme())}
-                      className="btn-primary text-sm flex items-center gap-2"
-                    >
+                    <button onClick={() => dispatch(toggleTheme())} className="btn-primary text-sm flex items-center gap-2 flex-shrink-0">
                       {theme === 'dark' ? <HiSun /> : <HiMoon />}
-                      {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                      <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'} Mode</span>
                     </button>
                   </div>
 
@@ -303,13 +392,12 @@ const SettingsPage = () => {
                     <p className="text-sm font-semibold text-dark-800 dark:text-dark-100 mb-3">Default File View</p>
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { mode: 'grid', icon: HiViewGrid, label: 'Grid View', desc: 'Thumbnail cards' },
-                        { mode: 'list', icon: HiViewList, label: 'List View', desc: 'Compact rows' },
-                      ].map(({ mode, icon: Icon, label, desc }) => {
+                        { mode: 'grid', Icon: HiViewGrid, label: 'Grid View', desc: 'Thumbnail cards' },
+                        { mode: 'list', Icon: HiViewList, label: 'List View', desc: 'Compact rows' },
+                      ].map(({ mode, Icon, label, desc }) => {
                         const active = (localStorage.getItem('viewMode') || 'grid') === mode
                         return (
-                          <button
-                            key={mode}
+                          <button key={mode}
                             onClick={() => { localStorage.setItem('viewMode', mode); window.location.reload() }}
                             className={`flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all ${
                               active
@@ -317,8 +405,8 @@ const SettingsPage = () => {
                                 : 'border-slate-200 dark:border-dark-600 hover:border-primary-300'
                             }`}
                           >
-                            <Icon className={`text-2xl ${active ? 'text-primary-500' : 'text-dark-400'}`} />
-                            <div>
+                            <Icon className={`text-2xl flex-shrink-0 ${active ? 'text-primary-500' : 'text-dark-400'}`} />
+                            <div className="min-w-0">
                               <p className={`text-sm font-semibold ${active ? 'text-primary-700 dark:text-primary-300' : 'text-dark-700 dark:text-dark-200'}`}>{label}</p>
                               <p className="text-xs text-dark-400">{desc}</p>
                             </div>
@@ -328,29 +416,72 @@ const SettingsPage = () => {
                       })}
                     </div>
                   </div>
-                </SectionCard>
+                </>
               )}
 
               {/* ━━━ NOTIFICATIONS ━━━ */}
               {activeSection === 'notifications' && (
-                <SectionCard title="Notifications" subtitle="Choose what you want to be notified about">
-                  <div className="rounded-2xl border border-slate-100 dark:border-dark-700 overflow-hidden divide-y divide-slate-50 dark:divide-dark-800">
-                    <Toggle checked label="Upload complete"        description="When a file upload finishes" onChange={() => {}} />
-                    <Toggle checked label="File shared with you"   description="When someone shares a file" onChange={() => {}} />
-                    <Toggle checked label="Security alerts"        description="New logins and suspicious activity" onChange={() => {}} />
-                    <Toggle checked label="Storage warning"        description="When storage exceeds 80%" onChange={() => {}} />
-                    <Toggle checked={false} label="AI task complete" description="When AI tagging or rename finishes" onChange={() => {}} />
-                    <Toggle checked={false} label="File request upload" description="When someone uploads to your request link" onChange={() => {}} />
+                <>
+                  <div className="pb-4 border-b border-slate-100 dark:border-dark-700">
+                    <h2 className="text-base font-bold text-dark-900 dark:text-white">Notifications</h2>
+                    <p className="text-xs text-dark-400 mt-0.5">Choose what you get notified about</p>
                   </div>
-                  <p className="text-xs text-dark-400 bg-slate-50 dark:bg-dark-800 rounded-xl px-4 py-3">
-                    🔔 Notifications are sent in-app via the bell icon. Email notifications require your email to be configured in settings.
-                  </p>
-                </SectionCard>
+
+                  {/* Groups */}
+                  {[
+                    {
+                      title: 'File Activity',
+                      items: [
+                        { label: 'Upload complete', description: 'When a file finishes uploading', on: true },
+                        { label: 'Download started', description: 'When someone downloads your shared file', on: false },
+                        { label: 'File deleted', description: 'When you move a file to trash', on: false },
+                      ],
+                    },
+                    {
+                      title: 'Sharing & Collaboration',
+                      items: [
+                        { label: 'File shared with you', description: 'When someone shares a file or folder', on: true },
+                        { label: 'New comment', description: 'When someone comments on your file', on: true },
+                        { label: 'File request upload', description: 'When someone uploads to your request link', on: true },
+                        { label: 'Permission changed', description: 'When your access level changes', on: true },
+                      ],
+                    },
+                    {
+                      title: 'Security & Storage',
+                      items: [
+                        { label: 'New login detected', description: 'When your account is accessed from a new device', on: true },
+                        { label: 'Storage warning', description: 'When you use more than 80% of storage', on: true },
+                        { label: 'AI task complete', description: 'When AI tagging, rename or OCR finishes', on: false },
+                      ],
+                    },
+                  ].map(group => (
+                    <div key={group.title} className="rounded-2xl border border-slate-100 dark:border-dark-700 overflow-hidden">
+                      <div className="px-4 py-2.5 bg-slate-50 dark:bg-dark-800 border-b border-slate-100 dark:border-dark-700">
+                        <p className="text-xs font-bold text-dark-500 dark:text-dark-400 uppercase tracking-wider">{group.title}</p>
+                      </div>
+                      <div className="px-4">
+                        {group.items.map(item => (
+                          <Toggle key={item.label} label={item.label} description={item.description} defaultChecked={item.on} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 text-xs text-blue-700 dark:text-blue-400">
+                    <HiBell className="text-base flex-shrink-0 mt-0.5" />
+                    <p>Notifications appear in the bell icon in the top bar in real-time. Email notifications require a configured email address.</p>
+                  </div>
+                </>
               )}
 
               {/* ━━━ SECURITY ━━━ */}
               {activeSection === 'security' && (
-                <SectionCard title="Security" subtitle="Manage your password and account access">
+                <>
+                  <div className="pb-4 border-b border-slate-100 dark:border-dark-700">
+                    <h2 className="text-base font-bold text-dark-900 dark:text-white">Security</h2>
+                    <p className="text-xs text-dark-400 mt-0.5">Manage your password and account access</p>
+                  </div>
+
                   {/* Status */}
                   <div className="flex items-center gap-3 p-4 rounded-2xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30">
                     <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
@@ -358,63 +489,60 @@ const SettingsPage = () => {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-green-800 dark:text-green-300">Account Secured</p>
-                      <p className="text-xs text-green-600 dark:text-green-500">Protected by email & password · Last login: {user?.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : '—'}</p>
+                      <p className="text-xs text-green-600 dark:text-green-500">
+                        Last login: {user?.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : '—'}
+                      </p>
                     </div>
                   </div>
 
                   {/* Change password */}
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-dark-800 space-y-3">
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-dark-800 space-y-4">
                     <p className="text-sm font-bold text-dark-800 dark:text-dark-100 flex items-center gap-2">
                       <HiLockClosed className="text-primary-500" /> Change Password
                     </p>
                     {[
                       { label: 'Current Password', val: curPwd,  set: setCurPwd,  ph: 'Enter current password' },
                       { label: 'New Password',      val: newPwd,  set: setNewPwd,  ph: 'At least 6 characters' },
-                      { label: 'Confirm Password',  val: cnfPwd,  set: setCnfPwd,  ph: 'Repeat new password' },
+                      { label: 'Confirm New',       val: cnfPwd,  set: setCnfPwd,  ph: 'Repeat new password' },
                     ].map(({ label, val, set, ph }) => (
                       <div key={label}>
                         <label className="block text-xs font-medium text-dark-500 dark:text-dark-400 mb-1">{label}</label>
                         <div className="relative">
                           <input
                             type={showPwd ? 'text' : 'password'}
-                            value={val}
-                            onChange={e => set(e.target.value)}
-                            placeholder={ph}
-                            className="input pr-10"
+                            value={val} onChange={e => set(e.target.value)}
+                            placeholder={ph} className="input pr-10"
                           />
-                          <button
-                            type="button"
-                            onClick={() => setShowPwd(s => !s)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-600 dark:hover:text-dark-200"
-                          >
+                          <button type="button" onClick={() => setShowPwd(s => !s)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-600 dark:hover:text-dark-200">
                             {showPwd ? <HiEyeOff /> : <HiEye />}
                           </button>
                         </div>
                       </div>
                     ))}
 
-                    {/* Password strength */}
+                    {/* Strength bar */}
                     {newPwd.length > 0 && (
                       <div className="space-y-1">
                         <div className="h-1.5 rounded-full bg-slate-200 dark:bg-dark-700 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              newPwd.length < 6 ? 'w-1/4 bg-red-500' :
-                              newPwd.length < 10 ? 'w-2/4 bg-amber-500' :
-                              'w-full bg-green-500'
-                            }`}
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(strengthLevel / 3) * 100}%` }}
+                            className={`h-full rounded-full transition-all ${strengthColor[strengthLevel]}`}
                           />
                         </div>
-                        <p className={`text-xs ${newPwd.length < 6 ? 'text-red-500' : newPwd.length < 10 ? 'text-amber-500' : 'text-green-500'}`}>
-                          {newPwd.length < 6 ? 'Too short' : newPwd.length < 10 ? 'Fair' : 'Strong password'}
+                        <p className={`text-xs font-medium ${
+                          strengthLevel === 1 ? 'text-red-500' : strengthLevel === 2 ? 'text-amber-500' : 'text-green-500'
+                        }`}>
+                          {strengthLabel[strengthLevel]}
                         </p>
                       </div>
                     )}
 
                     <button onClick={changePassword} disabled={chgPwd} className="btn-primary text-sm flex items-center gap-2">
                       {chgPwd
-                        ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Changing...</>
-                        : <><HiLockClosed /> Change Password</>
+                        ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Changing...</>
+                        : <><HiLockClosed />Change Password</>
                       }
                     </button>
                   </div>
@@ -422,44 +550,37 @@ const SettingsPage = () => {
                   {/* Danger zone */}
                   <div className="p-4 rounded-2xl border-2 border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10 space-y-3">
                     <p className="text-sm font-bold text-red-700 dark:text-red-400">⚠️ Danger Zone</p>
-                    <p className="text-xs text-red-600 dark:text-red-500">
-                      Deleting your account will permanently remove all metadata, activities, and settings.
-                      Your files in Google Drive are not affected.
+                    <p className="text-xs text-red-600 dark:text-red-500 leading-relaxed">
+                      Deleting your account removes all metadata, activities, and settings from Air Drive.
+                      Your actual files in Google Drive are not affected.
                     </p>
-                    <button
-                      onClick={deleteAccount}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors"
-                    >
+                    <button onClick={deleteAccount}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors">
                       <HiTrash /> Delete My Account
                     </button>
                   </div>
-                </SectionCard>
+                </>
               )}
 
               {/* ━━━ ACTIVITY ━━━ */}
               {activeSection === 'activity' && (
-                <SectionCard title="Activity Log" subtitle="Your recent actions across Air Drive">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-dark-400">
-                      {actData?.activities?.length
-                        ? `Showing ${Math.min(actData.activities.length, 30)} recent actions`
-                        : 'No actions recorded yet'}
-                    </p>
-                    <button
-                      onClick={() => actRefetch()}
-                      className="btn-secondary text-xs flex items-center gap-1.5 py-1.5"
-                    >
-                      <HiRefresh className={actLoading ? 'animate-spin' : ''} />
-                      Refresh
+                <>
+                  <div className="pb-4 border-b border-slate-100 dark:border-dark-700 flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-bold text-dark-900 dark:text-white">Activity Log</h2>
+                      <p className="text-xs text-dark-400 mt-0.5">Your recent actions across Air Drive</p>
+                    </div>
+                    <button onClick={() => actRefetch()} className="btn-secondary text-xs flex items-center gap-1.5 py-1.5 flex-shrink-0">
+                      <HiRefresh className={actLoading ? 'animate-spin' : ''} /> Refresh
                     </button>
                   </div>
 
-                  {/* Loading */}
+                  {/* Loading skeletons */}
                   {actLoading && (
                     <div className="space-y-2">
-                      {[...Array(6)].map((_, i) => (
+                      {[...Array(7)].map((_, i) => (
                         <div key={i} className="flex items-center gap-3 py-2">
-                          <div className="skeleton w-16 h-5 rounded-full flex-shrink-0" />
+                          <div className="skeleton w-20 h-5 rounded-full flex-shrink-0" />
                           <div className="skeleton h-4 flex-1 rounded" />
                           <div className="skeleton w-20 h-3 rounded hidden sm:block" />
                         </div>
@@ -469,12 +590,9 @@ const SettingsPage = () => {
 
                   {/* Error */}
                   {actError && !actLoading && (
-                    <div className="flex flex-col items-center py-8 text-center">
-                      <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-3">
-                        <HiRefresh className="text-red-500 text-xl" />
-                      </div>
+                    <div className="flex flex-col items-center py-10 text-center rounded-2xl border-2 border-dashed border-red-200 dark:border-red-900/40">
+                      <HiRefresh className="text-3xl text-red-400 mb-2" />
                       <p className="text-sm font-medium text-dark-700 dark:text-dark-200">Could not load activity</p>
-                      <p className="text-xs text-dark-400 mt-1">Check your connection</p>
                       <button onClick={() => actRefetch()} className="btn-secondary text-xs mt-3">Try Again</button>
                     </div>
                   )}
@@ -482,59 +600,59 @@ const SettingsPage = () => {
                   {/* Heatmap */}
                   {!actLoading && !actError && actData?.heatmap?.length > 0 && (
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-dark-800 overflow-x-auto">
-                      <p className="text-xs font-semibold text-dark-500 dark:text-dark-400 uppercase tracking-wider mb-3">
-                        Activity — Last 12 Months
+                      <p className="text-xs font-semibold text-dark-400 uppercase tracking-wider mb-3">
+                        Last 12 months
                       </p>
                       <ActivityHeatmap heatmap={actData.heatmap} />
                     </div>
                   )}
 
-                  {/* Activity list */}
-                  {!actLoading && !actError && (
-                    <>
-                      {(!actData?.activities?.length) ? (
-                        <div className="flex flex-col items-center py-12 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-dark-700">
-                          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-dark-800 flex items-center justify-center mb-3">
-                            <HiClock className="text-3xl text-dark-300" />
-                          </div>
-                          <p className="text-sm font-semibold text-dark-600 dark:text-dark-300">No activity yet</p>
-                          <p className="text-xs text-dark-400 mt-1 max-w-xs">
-                            Upload, view, rename, or organize a file to start building your activity log.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="rounded-2xl border border-slate-100 dark:border-dark-700 overflow-hidden">
-                          {/* Table header */}
-                          <div className="hidden sm:grid grid-cols-[120px_1fr_120px] gap-3 px-4 py-2 bg-slate-50 dark:bg-dark-800 text-xs font-semibold text-dark-400 uppercase tracking-wider">
-                            <span>Action</span>
-                            <span>File / Detail</span>
-                            <span className="text-right">Date</span>
-                          </div>
-                          {/* Rows */}
-                          {actData.activities.slice(0, 30).map((a, i) => (
-                            <motion.div
-                              key={a._id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ delay: i * 0.02 }}
-                              className="grid grid-cols-1 sm:grid-cols-[120px_1fr_120px] gap-1 sm:gap-3 items-center px-4 py-3 border-b border-slate-50 dark:border-dark-800 last:border-0 hover:bg-slate-50 dark:hover:bg-dark-800/50 transition-colors"
-                            >
-                              <span className={`w-fit px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${ACTION_BADGE[a.action] || ACTION_BADGE.default}`}>
-                                {a.action?.replace(/_/g, ' ')}
-                              </span>
-                              <span className="text-sm text-dark-600 dark:text-dark-300 truncate">
-                                {a.fileId?.name || a.folderId?.name || a.details || '—'}
-                              </span>
-                              <span className="text-xs text-dark-400 sm:text-right">
-                                {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </span>
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-                    </>
+                  {/* Empty */}
+                  {!actLoading && !actError && !actData?.activities?.length && (
+                    <div className="flex flex-col items-center py-14 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-dark-700">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-dark-800 flex items-center justify-center mb-3">
+                        <HiClock className="text-3xl text-dark-300" />
+                      </div>
+                      <p className="text-sm font-semibold text-dark-600 dark:text-dark-300">No activity yet</p>
+                      <p className="text-xs text-dark-400 mt-1 max-w-xs">
+                        Upload, rename, share, or organize files to start your activity history.
+                      </p>
+                    </div>
                   )}
-                </SectionCard>
+
+                  {/* Activity table */}
+                  {!actLoading && !actError && actData?.activities?.length > 0 && (
+                    <div className="rounded-2xl border border-slate-100 dark:border-dark-700 overflow-hidden">
+                      {/* Header row — hidden on mobile */}
+                      <div className="hidden sm:grid grid-cols-[130px_1fr_110px] gap-3 px-4 py-2.5
+                        bg-slate-50 dark:bg-dark-800 text-xs font-bold text-dark-400 uppercase tracking-wider
+                        border-b border-slate-100 dark:border-dark-700">
+                        <span>Action</span>
+                        <span>File / Detail</span>
+                        <span className="text-right">Date</span>
+                      </div>
+
+                      {actData.activities.slice(0, 30).map((a, i) => (
+                        <motion.div key={a._id}
+                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.015 }}
+                          className="flex flex-col sm:grid sm:grid-cols-[130px_1fr_110px] gap-1 sm:gap-3 items-start sm:items-center
+                            px-4 py-3 border-b border-slate-50 dark:border-dark-800 last:border-0
+                            hover:bg-slate-50/80 dark:hover:bg-dark-800/60 transition-colors"
+                        >
+                          <span className={`w-fit px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${ACTION_BADGE[a.action] || ACTION_BADGE.default}`}>
+                            {a.action?.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-sm text-dark-600 dark:text-dark-300 truncate w-full">
+                            {a.fileId?.name || a.folderId?.name || a.details || '—'}
+                          </span>
+                          <span className="text-xs text-dark-400 sm:text-right">
+                            {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
 
             </motion.div>
