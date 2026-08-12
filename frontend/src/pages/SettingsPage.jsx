@@ -149,22 +149,39 @@ const SettingsPage = () => {
     if (!file.type.startsWith('image/')) return toast.error('Select an image file')
 
     const reader = new FileReader()
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const base64 = ev.target.result
-      // Only update local state + Redux preview — server saved on Save Changes
+      const prev = userRef.current?.photo || ''
       setPhoto(base64)
       dispatch(setUser({ ...userRef.current, photo: base64 }))
+      setPhotoLoading(true)
+      try {
+        await api.patch('/users/profile', { photo: base64 })
+        toast.success('Profile photo updated')
+      } catch {
+        setPhoto(prev)
+        dispatch(setUser({ ...userRef.current, photo: prev }))
+        toast.error('Failed to update photo')
+      }
+      setPhotoLoading(false)
     }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
 
-  const handleRemovePhoto = () => {
+  const handleRemovePhoto = async () => {
     if (!window.confirm('Remove your profile photo?')) return
-    // Only clear local state + Redux preview — server saved on Save Changes
+    const prev = userRef.current?.photo || ''
     setPhoto('')
     dispatch(setUser({ ...userRef.current, photo: '' }))
-    toast.success('Photo removed — click Save Changes to confirm')
+    try {
+      await api.patch('/users/profile', { photo: '' })
+      toast.success('Profile photo removed')
+    } catch {
+      setPhoto(prev)
+      dispatch(setUser({ ...userRef.current, photo: prev }))
+      toast.error('Failed to remove photo')
+    }
   }
 
   /* ── Profile save ── */
@@ -172,12 +189,9 @@ const SettingsPage = () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
     try {
-      // Save both name AND current photo state to server atomically
-      const updatedUser = await dispatch(updateProfile({ name: name.trim(), photo: photo })).unwrap()
-      if (updatedUser) {
-        dispatch(setUser({ ...updatedUser }))
-        setPhoto(updatedUser.photo || '')
-      }
+      // Only save name — photo is saved immediately by its own handlers
+      const updatedUser = await dispatch(updateProfile({ name: name.trim() })).unwrap()
+      if (updatedUser) dispatch(setUser({ ...updatedUser, photo: photo }))
       toast.success('Profile updated')
     } catch { toast.error('Failed to update') }
     setSaving(false)
