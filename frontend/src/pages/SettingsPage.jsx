@@ -199,8 +199,12 @@ const SettingsPage = () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
     try {
-      // Always send photo alongside name so the server keeps the current photo state
-      await dispatch(updateProfile({ name: name.trim(), photo: photo })).unwrap()
+      const updatedUser = await dispatch(updateProfile({ name: name.trim(), photo: photo })).unwrap()
+      // Force sync local state and Redux with exact server values
+      if (updatedUser) {
+        dispatch(setUser({ ...updatedUser }))
+        setPhoto(updatedUser.photo || '')
+      }
       toast.success('Profile updated')
     } catch { toast.error('Failed to update') }
     setSaving(false)

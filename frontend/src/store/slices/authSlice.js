@@ -129,7 +129,7 @@ const authSlice = createSlice({
   },
   reducers: {
     setUser(state, action) {
-      state.user = action.payload
+      state.user = action.payload ? { ...action.payload, _updatedAt: Date.now() } : null
       state.isAuthenticated = !!action.payload
       state.initialized = true
     },
@@ -189,8 +189,7 @@ const authSlice = createSlice({
       // updateProfile — server always returns the full updated user via toPublic()
       .addCase(updateProfile.fulfilled, (state, action) => {
         if (action.payload && typeof action.payload === 'object') {
-          // Replace user entirely with the server-returned object so no stale fields remain
-          state.user = { ...action.payload }
+          state.user = { ...action.payload, _updatedAt: Date.now() }
         }
       })
   },
