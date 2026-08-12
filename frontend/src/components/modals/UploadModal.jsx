@@ -71,10 +71,10 @@ const UploadModal = () => {
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="modal-surface card w-full max-w-lg overflow-hidden"
+        className="card flex h-[min(760px,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-b-none sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
       >
         {/* Header */}
-        <div className="flex items-center gap-3 p-5 border-b border-slate-100 dark:border-dark-700">
+        <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-100 p-4 dark:border-dark-700 sm:p-5">
           <div className="w-9 h-9 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
             <HiUpload className="text-primary-500 text-lg" />
           </div>
@@ -86,13 +86,13 @@ const UploadModal = () => {
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
           {/* Drop zone */}
           <div
             onDrop={handleDrop}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
-            className={`relative border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+            className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-5 text-center transition-all sm:p-8 ${
               dragOver
                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                 : 'border-slate-200 dark:border-dark-600 hover:border-primary-400 hover:bg-slate-50 dark:hover:bg-dark-800'
@@ -196,7 +196,7 @@ const UploadModal = () => {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-3 px-5 pb-5">
+        <div className="flex flex-shrink-0 items-center gap-3 border-t border-slate-100 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.06)] dark:border-dark-700 dark:bg-dark-900 sm:p-5">
           <button
             onClick={() => dispatch(closeModal())}
             className="btn-secondary flex-1"
