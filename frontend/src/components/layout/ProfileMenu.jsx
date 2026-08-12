@@ -118,7 +118,7 @@ const ProfileMenu = () => {
   }, [])
 
   const onMouseEnter = () => { clearTimeout(hoverTimer.current); setOpen(true) }
-  const onMouseLeave = () => { hoverTimer.current = setTimeout(() => setOpen(false), 250) }
+  const onMouseLeave = () => { hoverTimer.current = setTimeout(() => setOpen(false), 400) }
 
   const handleLogout = async () => {
     setOpen(false)
@@ -168,19 +168,22 @@ const ProfileMenu = () => {
       {/* ── Dropdown panel ── */}
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -6 }}
-            transition={{ duration: 0.14, ease: 'easeOut' }}
-            onMouseEnter={onMouseEnter}
-            onMouseLeave={onMouseLeave}
-            className="absolute right-0 top-full mt-2.5 w-72
-              bg-white dark:bg-dark-800 rounded-2xl
-              shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]
-              border border-slate-100 dark:border-dark-700
-              overflow-hidden z-50"
-          >
+          <>
+            {/* invisible bridge so gap between trigger and panel doesn't close menu */}
+            <div className="absolute right-0 top-full h-3 w-72" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -6 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+              onMouseEnter={onMouseEnter}
+              onMouseLeave={onMouseLeave}
+              className="absolute right-0 top-full mt-2.5 w-72
+                bg-white dark:bg-dark-800 rounded-2xl
+                shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]
+                border border-slate-100 dark:border-dark-700
+                overflow-y-auto max-h-[90vh] z-50"
+            >
             {/* Header */}
             <div className="flex items-center gap-3 p-4
               bg-gradient-to-r from-primary-50 via-white to-purple-50
@@ -271,6 +274,7 @@ const ProfileMenu = () => {
               </button>
             </div>
           </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
