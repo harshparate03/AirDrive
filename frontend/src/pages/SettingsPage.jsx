@@ -111,10 +111,14 @@ const SettingsPage = () => {
   const [name, setName]       = useState(user?.name || '')
   const [saving, setSaving]   = useState(false)
   const [photo, setPhoto]     = useState(user?.photo || '')
+  const photoRef              = useRef(user?.photo || '') // always-current photo for saveProfile
   const [photoLoading, setPhotoLoading] = useState(false)
   const photoInputRef         = useRef(null)
   const userRef               = useRef(user)
   useEffect(() => { userRef.current = user }, [user])
+
+  // Keep photoRef in sync with photo state
+  useEffect(() => { photoRef.current = photo }, [photo])
 
   // Sync name when Redux user updates
   useEffect(() => {
@@ -153,6 +157,7 @@ const SettingsPage = () => {
     const reader = new FileReader()
     reader.onload = (ev) => {
       const base64 = ev.target.result
+      photoRef.current = base64
       setPhoto(base64)
       dispatch(setUser({ ...userRef.current, photo: base64 }))
       toast('Photo selected — click Save Changes to save', { icon: '📷' })
@@ -163,6 +168,7 @@ const SettingsPage = () => {
 
   const handleRemovePhoto = () => {
     if (!window.confirm('Remove your profile photo?')) return
+    photoRef.current = ''
     setPhoto('')
     dispatch(setUser({ ...userRef.current, photo: '' }))
     toast('Photo removed — click Save Changes to save', { icon: '🗑️' })
@@ -172,12 +178,14 @@ const SettingsPage = () => {
   const saveProfile = async () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
+    // Use photoRef.current — always the latest value, never stale
+    const currentPhoto = photoRef.current
     try {
-      // Save name + current photo state together in one atomic request
-      const res = await api.patch('/users/profile', { name: name.trim(), photo: photo })
+      const res = await api.patch('/users/profile', { name: name.trim(), photo: currentPhoto })
       const serverUser = res.data?.user
       if (serverUser) {
-        dispatch(setUser({ ...serverUser, photo: photo }))
+        dispatch(setUser({ ...serverUser, photo: currentPhoto }))
+        setPhoto(currentPhoto)
       }
       toast.success('Profile updated')
     } catch (err) {
