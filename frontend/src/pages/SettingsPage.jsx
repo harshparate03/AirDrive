@@ -18,6 +18,40 @@ import ActivityHeatmap from '../components/charts/ActivityHeatmap'
 import ThemePicker from '../components/ui/ThemePicker'
 import { DefaultAvatar } from '../components/layout/ProfileMenu'
 
+/* ── UserAvatar helper reused from ProfileMenu ── */
+const UserAvatar = ({ src, name, size = 96 }) => {
+  if (src) {
+    return (
+      <div
+        style={{ width: size + 4, height: size + 4 }}
+        className="rounded-2xl bg-gradient-to-br from-primary-400 to-purple-600 p-[2.5px] flex-shrink-0"
+      >
+        <img
+          src={src}
+          alt={name}
+          style={{ width: size, height: size }}
+          className="rounded-2xl object-cover w-full h-full block"
+        />
+      </div>
+    )
+  }
+  return (
+    <div
+      style={{ width: size + 4, height: size + 4 }}
+      className="rounded-2xl bg-gradient-to-br from-primary-400 to-purple-600 p-[2.5px] flex-shrink-0"
+    >
+      <div
+        style={{ width: size, height: size }}
+        className="rounded-2xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center"
+      >
+        <span style={{ fontSize: size * 0.36 }} className="text-white font-bold select-none">
+          {(name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 /* ─── helpers ───────────────────────────────────── */
 const ACTION_BADGE = {
   upload:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
@@ -232,39 +266,28 @@ const SettingsPage = () => {
 
                   {/* Photo upload */}
                   <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-                    {/* Avatar */}
+                    {/* Avatar with gradient border */}
                     <div className="relative flex-shrink-0">
-                      <div className="w-24 h-24 rounded-2xl overflow-hidden ring-4 ring-white dark:ring-dark-700 shadow-lg">
-                        {photoLoading ? (
-                          <div className="w-full h-full bg-slate-100 dark:bg-dark-700 flex items-center justify-center">
-                            <div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" />
-                          </div>
-                        ) : photo ? (
-                          <img src={photo} alt={user?.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full">
-                            <DefaultAvatar name={user?.name || 'U'} size={96} />
-                          </div>
-                        )}
-                      </div>
-                      {/* Camera overlay button */}
+                      {photoLoading ? (
+                        <div style={{ width: 100, height: 100 }}
+                          className="rounded-2xl bg-slate-100 dark:bg-dark-700 flex items-center justify-center shadow-lg ring-4 ring-white dark:ring-dark-700">
+                          <div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      ) : (
+                        <UserAvatar src={photo} name={user?.name} size={96} />
+                      )}
+                      {/* Camera button */}
                       <button
                         onClick={() => photoInputRef.current?.click()}
                         disabled={photoLoading}
+                        title="Change photo"
                         className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full
                           bg-primary-600 hover:bg-primary-700 text-white shadow-lg
-                          flex items-center justify-center transition-colors"
-                        title="Change photo"
+                          flex items-center justify-center transition-colors z-10 border-2 border-white dark:border-dark-800"
                       >
                         <HiCamera className="text-sm" />
                       </button>
-                      <input
-                        ref={photoInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handlePhotoSelect}
-                      />
+                      <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
                     </div>
 
                     {/* Photo actions */}
