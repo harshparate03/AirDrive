@@ -26,18 +26,31 @@ router.get('/profile', authenticate, async (req, res) => {
 router.patch('/profile', authenticate, async (req, res) => {
   try {
     const { name, photo, preferences } = req.body;
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const update = { $set: {} };
 
-    if (name) user.name = name;
-    if (photo !== undefined) user.photo = photo; // base64 or URL or empty string
-    if (preferences) {
-      user.preferences = { ...user.preferences.toObject?.() || user.preferences, ...preferences };
+    if (name) update.$set.name = name;
+
+    // photo: '' means remove, any other string means set
+    if (photo !== undefined) {
+      update.$set.photo = photo; // empty string clears it
     }
 
-    await user.save();
+    if (preferences) {
+      const existing = await require('../models/User').findById(req.user._id).select('preferences').lean();
+      const merged = { ...((existing?.preferences || {})), ...preferences };
+      update.$set.preferences = merged;
+    }
+
+    const user = await require('../models/User').findByIdAndUpdate(
+      req.user._id,
+      update,
+      { new: true, runValidators: false }
+    );
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ user: user.toPublic() });
   } catch (error) {
+    console.error('Profile update error:', error.message);
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
