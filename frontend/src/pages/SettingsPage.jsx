@@ -9,7 +9,7 @@ import {
   HiColorSwatch, HiViewGrid, HiViewList, HiSparkles,
   HiUpload, HiCamera,
 } from 'react-icons/hi'
-import { updateProfile } from '../store/slices/authSlice'
+import { updateProfile, setUser } from '../store/slices/authSlice'
 import { toggleTheme } from '../store/slices/uiSlice'
 import toast from 'react-hot-toast'
 import api from '../services/api'
@@ -153,17 +153,20 @@ const SettingsPage = () => {
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const base64 = ev.target.result
-      // Optimistically show preview immediately
+      // Optimistically show preview + update Redux so TopBar/Sidebar icon updates immediately
       setPhoto(base64)
+      dispatch(setUser({ ...user, photo: base64 }))
       setPhotoLoading(true)
       try {
         const updatedUser = await dispatch(updateProfile({ photo: base64 })).unwrap()
-        // Sync local state to whatever the server returned (could be URL or base64)
+        // Sync to server-returned value
         setPhoto(updatedUser?.photo || '')
+        dispatch(setUser(updatedUser))
         toast.success('Profile photo updated')
       } catch {
         // Revert on failure
         setPhoto(user?.photo || '')
+        dispatch(setUser(user))
         toast.error('Failed to update photo')
       }
       setPhotoLoading(false)
@@ -175,14 +178,17 @@ const SettingsPage = () => {
   const handleRemovePhoto = async () => {
     if (!window.confirm('Remove your profile photo?')) return
     setPhotoLoading(true)
-    // Optimistically clear photo immediately so default avatar shows right away
+    // Immediately update Redux so TopBar/Sidebar profile icon switches to default avatar
     setPhoto('')
+    dispatch(setUser({ ...user, photo: '' }))
     try {
-      await dispatch(updateProfile({ photo: '' })).unwrap()
+      const updatedUser = await dispatch(updateProfile({ photo: '' })).unwrap()
+      dispatch(setUser(updatedUser))
       toast.success('Profile photo removed')
     } catch {
       // Revert on failure
       setPhoto(user?.photo || '')
+      dispatch(setUser(user))
       toast.error('Failed to remove photo')
     }
     setPhotoLoading(false)
