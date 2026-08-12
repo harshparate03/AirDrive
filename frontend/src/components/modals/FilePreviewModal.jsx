@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useSelector, useDispatch } from 'react-redux'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { HiX, HiDownload, HiExternalLink } from 'react-icons/hi'
 import { closeModal } from '../../store/slices/uiSlice'
 import api, { downloadFile } from '../../services/api'
@@ -10,13 +11,26 @@ import toast from 'react-hot-toast'
 
 const FilePreviewModal = () => {
   const dispatch = useDispatch()
+  const queryClient = useQueryClient()
   const { modalData: file } = useSelector(state => state.ui)
+  const [aiTags, setAiTags] = useState(file?.aiTags || [])
   const [previewUrl, setPreviewUrl] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewInfo, setPreviewInfo] = useState(null)
   const mime = file?.mimeType || ''
   const canPreviewType = mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime.startsWith('text/') || mime === 'application/pdf'
   const canPreview = canPreviewType && (file?.size || 0) <= 25 * 1024 * 1024
+
+  const removeTags = useMutation({
+    mutationFn: (tag) => api.delete('/ai/tags', { data: { fileId: file._id, tag: tag || undefined } }),
+    onSuccess: (response) => {
+      setAiTags(response.data.tags || [])
+      queryClient.invalidateQueries({ queryKey: ['files'] })
+      queryClient.invalidateQueries({ queryKey: ['files-for-ai'] })
+      toast.success(response.data.tags?.length ? 'AI tag removed' : 'AI tags removed')
+    },
+    onError: (error) => toast.error(error.response?.data?.error || 'Could not remove AI tag'),
+  })
 
   useEffect(() => {
     let objectUrl = ''
@@ -146,13 +160,17 @@ const FilePreviewModal = () => {
         </div>
 
         {/* Meta */}
-        {file.aiTags?.length > 0 && (
+        {aiTags.length > 0 && (
           <div className="px-4 py-3 border-t border-slate-100 dark:border-dark-700">
-            <p className="text-xs font-medium text-dark-500 mb-2">AI Tags</p>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-medium text-dark-500">AI Tags</p>
+              <button type="button" onClick={() => removeTags.mutate(null)} disabled={removeTags.isPending} className="text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50">Remove all</button>
+            </div>
             <div className="flex flex-wrap gap-1.5">
-              {file.aiTags.map(tag => (
-                <span key={tag} className="badge bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400">
-                  {tag}
+              {aiTags.map(tag => (
+                <span key={tag} className="badge flex items-center gap-1 bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
+                  <span>{tag}</span>
+                  <button type="button" onClick={() => removeTags.mutate(tag)} disabled={removeTags.isPending} className="rounded-full p-0.5 hover:bg-primary-100 disabled:opacity-50 dark:hover:bg-primary-900/50" aria-label={`Remove ${tag} tag`}><HiX className="text-[10px]" /></button>
                 </span>
               ))}
             </div>
