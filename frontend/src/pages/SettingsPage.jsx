@@ -199,7 +199,8 @@ const SettingsPage = () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
     try {
-      await dispatch(updateProfile({ name: name.trim() })).unwrap()
+      // Always send photo alongside name so the server keeps the current photo state
+      await dispatch(updateProfile({ name: name.trim(), photo: photo })).unwrap()
       toast.success('Profile updated')
     } catch { toast.error('Failed to update') }
     setSaving(false)
