@@ -149,35 +149,22 @@ const SettingsPage = () => {
     if (!file.type.startsWith('image/')) return toast.error('Select an image file')
 
     const reader = new FileReader()
-    reader.onload = async (ev) => {
+    reader.onload = (ev) => {
       const base64 = ev.target.result
-      const prev = userRef.current?.photo || ''
-      // Show new photo immediately everywhere
+      // Only update local state + Redux preview — server saved on Save Changes
       setPhoto(base64)
       dispatch(setUser({ ...userRef.current, photo: base64 }))
-      setPhotoLoading(true)
-      try {
-        await api.patch('/users/profile', { photo: base64 })
-        toast.success('Profile photo updated')
-      } catch {
-        setPhoto(prev)
-        dispatch(setUser({ ...userRef.current, photo: prev }))
-        toast.error('Failed to update photo')
-      }
-      setPhotoLoading(false)
     }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
 
-  const handleRemovePhoto = async () => {
+  const handleRemovePhoto = () => {
     if (!window.confirm('Remove your profile photo?')) return
-    // Clear immediately — UI updates right away
+    // Only clear local state + Redux preview — server saved on Save Changes
     setPhoto('')
     dispatch(setUser({ ...userRef.current, photo: '' }))
-    // Fire and forget — saveProfile will persist it via Save Changes button
-    api.patch('/users/profile', { photo: '' }).catch(() => {})
-    toast.success('Profile photo removed')
+    toast.success('Photo removed — click Save Changes to confirm')
   }
 
   /* ── Profile save ── */
@@ -185,8 +172,8 @@ const SettingsPage = () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
     try {
+      // Save both name AND current photo state to server atomically
       const updatedUser = await dispatch(updateProfile({ name: name.trim(), photo: photo })).unwrap()
-      // Force sync local state and Redux with exact server values
       if (updatedUser) {
         dispatch(setUser({ ...updatedUser }))
         setPhoto(updatedUser.photo || '')
