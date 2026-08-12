@@ -121,11 +121,6 @@ const SettingsPage = () => {
     setName(user?.name || '')
   }, [user?.name])
 
-  // Sync photo when Redux user updates (e.g. after server confirms)
-  useEffect(() => {
-    setPhoto(user?.photo || '')
-  }, [user?.photo])
-
   // Password
   const [curPwd,  setCurPwd]  = useState('')
   const [newPwd,  setNewPwd]  = useState('')
@@ -177,21 +172,12 @@ const SettingsPage = () => {
 
   const handleRemovePhoto = async () => {
     if (!window.confirm('Remove your profile photo?')) return
-    const prev = userRef.current?.photo || ''
-    // 1. Instantly clear photo state — avatar switches to default immediately
+    // Clear immediately — UI updates right away
     setPhoto('')
-    // 2. Instantly update Redux — TopBar + Sidebar switch to default immediately  
     dispatch(setUser({ ...userRef.current, photo: '' }))
-    try {
-      // 3. Save to server in background
-      await api.patch('/users/profile', { photo: '' })
-      toast.success('Profile photo removed')
-    } catch (err) {
-      // 4. Only revert if server call failed
-      setPhoto(prev)
-      dispatch(setUser({ ...userRef.current, photo: prev }))
-      toast.error('Failed to remove photo')
-    }
+    // Fire and forget — saveProfile will persist it via Save Changes button
+    api.patch('/users/profile', { photo: '' }).catch(() => {})
+    toast.success('Profile photo removed')
   }
 
   /* ── Profile save ── */
