@@ -3,9 +3,9 @@ import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  HiUser, HiCog, HiLogout, HiShieldCheck, HiChartBar,
-  HiSparkles, HiMoon, HiSun, HiBell, HiFolder,
-  HiChevronRight, HiColorSwatch,
+  HiHome, HiFolder, HiShare, HiClock, HiStar, HiTrash,
+  HiSparkles, HiCloudUpload, HiChartBar, HiCog,
+  HiLogout, HiMoon, HiSun, HiChevronRight,
 } from 'react-icons/hi'
 import { logoutUser } from '../../store/slices/authSlice'
 import { toggleTheme } from '../../store/slices/uiSlice'
@@ -71,28 +71,21 @@ const UserAvatar = ({ user, size = 36, className = '' }) => {
 }
 
 /* ─────────────────────────────────────────────
-   Menu sections config
+   Menu items config
 ───────────────────────────────────────────── */
-const menuSections = [
-  {
-    items: [
-      { icon: HiUser,        label: 'My Profile',    to: '/settings', param: 'profile' },
-      { icon: HiCog,         label: 'Settings',      to: '/settings', param: 'appearance' },
-      { icon: HiBell,        label: 'Notifications', to: '/settings', param: 'notifications' },
-    ],
-  },
-  {
-    items: [
-      { icon: HiFolder,      label: 'My Drive',      to: '/my-drive' },
-      { icon: HiSparkles,    label: 'AI Assistant',  to: '/ai' },
-      { icon: HiChartBar,    label: 'Storage',       to: '/storage' },
-    ],
-  },
-  {
-    items: [
-      { icon: HiShieldCheck, label: 'Security',      to: '/settings', param: 'security' },
-    ],
-  },
+const menuItems = [
+  { icon: HiHome,        label: 'Home',           to: '/dashboard' },
+  { icon: HiFolder,      label: 'My Drive',       to: '/my-drive' },
+  { icon: HiShare,       label: 'Shared With Me', to: '/shared' },
+  { icon: HiClock,       label: 'Recent',         to: '/recent' },
+  { icon: HiStar,        label: 'Starred',        to: '/starred' },
+  { icon: HiTrash,       label: 'Trash',          to: '/trash' },
+  { divider: true },
+  { icon: HiSparkles,    label: 'AI Assistant',   to: '/ai' },
+  { icon: HiCloudUpload, label: 'File Requests',  to: '/requests' },
+  { icon: HiChartBar,    label: 'Storage',        to: '/storage' },
+  { divider: true },
+  { icon: HiCog,         label: 'Settings',       to: '/settings' },
 ]
 
 /* ─────────────────────────────────────────────
@@ -209,31 +202,29 @@ const ProfileMenu = () => {
 
             {/* Menu items */}
             <div className="p-2 space-y-0.5">
-              {menuSections.map((section, si) => (
-                <React.Fragment key={si}>
-                  {si > 0 && <div className="my-1.5 border-t border-slate-100 dark:border-dark-700" />}
-                  {section.items.map(item => (
-                    <button
-                      key={item.label}
-                      onClick={() => handleNav(item)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm
-                        text-dark-700 dark:text-dark-200
-                        hover:bg-slate-50 dark:hover:bg-dark-700/60
-                        transition-colors text-left group"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-dark-700
-                        group-hover:bg-primary-100 dark:group-hover:bg-primary-900/30
-                        flex items-center justify-center flex-shrink-0 transition-colors">
-                        <item.icon className="text-dark-500 dark:text-dark-400 group-hover:text-primary-500 text-base transition-colors" />
-                      </div>
-                      <span className="flex-1 font-medium">{item.label}</span>
-                      <HiChevronRight className="text-dark-300 dark:text-dark-600 text-sm
-                        opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0
-                        transition-all duration-150" />
-                    </button>
-                  ))}
-                </React.Fragment>
-              ))}
+              {menuItems.map((item, idx) => {
+                if (item.divider) return <div key={idx} className="my-1.5 border-t border-slate-100 dark:border-dark-700" />
+                return (
+                  <button
+                    key={item.label}
+                    onClick={() => { setOpen(false); navigate(item.to) }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm
+                      text-dark-700 dark:text-dark-200
+                      hover:bg-slate-50 dark:hover:bg-dark-700/60
+                      transition-colors text-left group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-dark-700
+                      group-hover:bg-primary-100 dark:group-hover:bg-primary-900/30
+                      flex items-center justify-center flex-shrink-0 transition-colors">
+                      <item.icon className="text-dark-500 dark:text-dark-400 group-hover:text-primary-500 text-base transition-colors" />
+                    </div>
+                    <span className="flex-1 font-medium">{item.label}</span>
+                    <HiChevronRight className="text-dark-300 dark:text-dark-600 text-sm
+                      opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0
+                      transition-all duration-150" />
+                  </button>
+                )
+              })}
 
               {/* Theme toggle */}
               <div className="my-1.5 border-t border-slate-100 dark:border-dark-700" />
