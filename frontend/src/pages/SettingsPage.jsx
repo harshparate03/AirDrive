@@ -153,20 +153,22 @@ const SettingsPage = () => {
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const base64 = ev.target.result
-      // Optimistically show preview + update Redux so TopBar/Sidebar icon updates immediately
+      const previousPhoto = user?.photo || ''
+      // Immediately show new photo in settings page + TopBar/Sidebar
       setPhoto(base64)
       dispatch(setUser({ ...user, photo: base64 }))
       setPhotoLoading(true)
       try {
-        const updatedUser = await dispatch(updateProfile({ photo: base64 })).unwrap()
-        // Sync to server-returned value
-        setPhoto(updatedUser?.photo || '')
-        dispatch(setUser(updatedUser))
+        await api.patch('/users/profile', { photo: base64 })
+        // Fetch fresh user to sync everything
+        const res = await api.get('/users/profile')
+        dispatch(setUser(res.data.user))
+        setPhoto(res.data.user?.photo || base64)
         toast.success('Profile photo updated')
       } catch {
         // Revert on failure
-        setPhoto(user?.photo || '')
-        dispatch(setUser(user))
+        setPhoto(previousPhoto)
+        dispatch(setUser({ ...user, photo: previousPhoto }))
         toast.error('Failed to update photo')
       }
       setPhotoLoading(false)
@@ -178,17 +180,22 @@ const SettingsPage = () => {
   const handleRemovePhoto = async () => {
     if (!window.confirm('Remove your profile photo?')) return
     setPhotoLoading(true)
-    // Immediately update Redux so TopBar/Sidebar profile icon switches to default avatar
+    // Capture old photo for revert
+    const previousPhoto = user?.photo || ''
+    // Immediately clear in Redux + local state — TopBar/Sidebar update right away
+    const clearedUser = { ...user, photo: '' }
     setPhoto('')
-    dispatch(setUser({ ...user, photo: '' }))
+    dispatch(setUser(clearedUser))
     try {
-      const updatedUser = await dispatch(updateProfile({ photo: '' })).unwrap()
-      dispatch(setUser(updatedUser))
+      await api.patch('/users/profile', { photo: '' })
+      // Fetch fresh user from server to ensure full sync
+      const res = await api.get('/users/profile')
+      dispatch(setUser(res.data.user))
       toast.success('Profile photo removed')
     } catch {
       // Revert on failure
-      setPhoto(user?.photo || '')
-      dispatch(setUser(user))
+      setPhoto(previousPhoto)
+      dispatch(setUser({ ...user, photo: previousPhoto }))
       toast.error('Failed to remove photo')
     }
     setPhotoLoading(false)
