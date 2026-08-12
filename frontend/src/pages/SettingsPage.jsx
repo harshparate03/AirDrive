@@ -178,9 +178,10 @@ const SettingsPage = () => {
     if (!window.confirm('Remove your profile photo?')) return
     const currentUser = userRef.current
     const previousPhoto = currentUser?.photo || ''
-    setPhotoLoading(true)
+    // Clear photo FIRST so default avatar shows immediately (no spinner yet)
     setPhoto('')
     dispatch(setUser(Object.assign({}, currentUser, { photo: '' })))
+    setPhotoLoading(true)
     try {
       const res = await api.patch('/users/profile', { photo: '' })
       const serverUser = res.data?.user
