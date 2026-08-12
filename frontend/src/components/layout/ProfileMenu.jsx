@@ -226,29 +226,6 @@ const ProfileMenu = () => {
                 )
               })}
 
-              {/* Theme toggle */}
-              <div className="my-1.5 border-t border-slate-100 dark:border-dark-700" />
-              <button
-                onClick={() => { dispatch(toggleTheme()); setOpen(false) }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm
-                  text-dark-700 dark:text-dark-200
-                  hover:bg-slate-50 dark:hover:bg-dark-700/60 transition-colors group"
-              >
-                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-dark-700
-                  group-hover:bg-amber-100 dark:group-hover:bg-amber-900/20
-                  flex items-center justify-center flex-shrink-0 transition-colors">
-                  {theme === 'dark'
-                    ? <HiSun className="text-amber-500 text-base" />
-                    : <HiMoon className="text-primary-500 text-base" />
-                  }
-                </div>
-                <span className="flex-1 font-medium">
-                  {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                </span>
-                <kbd className="text-[10px] text-dark-400 px-1.5 py-0.5 rounded-md
-                  bg-slate-100 dark:bg-dark-700 font-mono">D</kbd>
-              </button>
-
               {/* Logout */}
               <div className="my-1.5 border-t border-slate-100 dark:border-dark-700" />
               <button
