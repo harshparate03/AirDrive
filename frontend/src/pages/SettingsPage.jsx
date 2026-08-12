@@ -151,46 +151,21 @@ const SettingsPage = () => {
     if (!file.type.startsWith('image/')) return toast.error('Select an image file')
 
     const reader = new FileReader()
-    reader.onload = async (ev) => {
+    reader.onload = (ev) => {
       const base64 = ev.target.result
-      const prev = userRef.current?.photo || ''
       setPhoto(base64)
       dispatch(setUser({ ...userRef.current, photo: base64 }))
-      setPhotoLoading(true)
-      // Cancel any previous in-flight photo request
-      if (photoAbortRef.current) photoAbortRef.current.abort()
-      const controller = new AbortController()
-      photoAbortRef.current = controller
-      try {
-        await api.patch('/users/profile', { photo: base64 }, { signal: controller.signal })
-        toast.success('Profile photo updated')
-      } catch (err) {
-        if (err?.code === 'ERR_CANCELED' || err?.name === 'AbortError' || err?.name === 'CanceledError') return
-        setPhoto(prev)
-        dispatch(setUser({ ...userRef.current, photo: prev }))
-        toast.error('Failed to update photo')
-      }
-      setPhotoLoading(false)
+      toast('Photo selected — click Save Changes to save', { icon: '📷' })
     }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
 
-  const handleRemovePhoto = async () => {
+  const handleRemovePhoto = () => {
     if (!window.confirm('Remove your profile photo?')) return
-    // Cancel any in-flight photo upload first
-    if (photoAbortRef.current) { photoAbortRef.current.abort(); photoAbortRef.current = null }
-    const prev = userRef.current?.photo || ''
     setPhoto('')
     dispatch(setUser({ ...userRef.current, photo: '' }))
-    try {
-      await api.patch('/users/profile', { photo: '' })
-      toast.success('Profile photo removed')
-    } catch {
-      setPhoto(prev)
-      dispatch(setUser({ ...userRef.current, photo: prev }))
-      toast.error('Failed to remove photo')
-    }
+    toast('Photo removed — click Save Changes to save', { icon: '🗑️' })
   }
 
   /* ── Profile save ── */
@@ -198,11 +173,16 @@ const SettingsPage = () => {
     if (!name.trim()) return toast.error('Name cannot be empty')
     setSaving(true)
     try {
+      // Save name + current photo state together in one atomic request
       const res = await api.patch('/users/profile', { name: name.trim(), photo: photo })
       const serverUser = res.data?.user
-      if (serverUser) dispatch(setUser({ ...serverUser, photo: photo }))
+      if (serverUser) {
+        dispatch(setUser({ ...serverUser, photo: photo }))
+      }
       toast.success('Profile updated')
-    } catch { toast.error('Failed to update') }
+    } catch (err) {
+      toast.error('Failed to update: ' + (err?.response?.data?.error || err?.message || 'server error'))
+    }
     setSaving(false)
   }
 

@@ -32,6 +32,8 @@ router.patch('/profile', authenticate, async (req, res) => {
     // photo === '' clears it, any other string sets it
     if (typeof photo === 'string') update.$set.photo = photo;
 
+    console.log('Profile update - userId:', req.user._id, 'photo type:', typeof photo, 'photo length:', (photo||'').length, 'setting photo:', typeof photo === 'string');
+
     if (preferences) {
       const existing = await require('../models/User').findById(req.user._id).select('preferences').lean();
       const merged = { ...((existing?.preferences || {})), ...preferences };
@@ -49,6 +51,7 @@ router.patch('/profile', authenticate, async (req, res) => {
     );
 
     if (!user) return res.status(404).json({ error: 'User not found' });
+    console.log('Profile updated - photo in DB now:', (user.photo||'').length, 'chars');
     res.json({ user: user.toPublic() });
   } catch (error) {
     console.error('Profile update error:', error.message);
