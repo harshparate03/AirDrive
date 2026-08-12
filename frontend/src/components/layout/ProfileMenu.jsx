@@ -17,12 +17,9 @@ import toast from 'react-hot-toast'
    a visible gradient border ring.
 ───────────────────────────────────────────── */
 export const DefaultAvatar = ({ name = 'U', size = 36, className = '' }) => {
-  const initials = (name || 'U')
-    .split(' ')
-    .map(w => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+  const initials = (name && name.trim())
+    ? name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    : 'U'
 
   return (
     <div
@@ -53,7 +50,8 @@ export const DefaultAvatar = ({ name = 'U', size = 36, className = '' }) => {
    with a consistent ring border in both cases
 ───────────────────────────────────────────── */
 const UserAvatar = ({ user, size = 36, className = '' }) => {
-  if (user?.photo) {
+  // treat empty string as no photo
+  if (user?.photo && user.photo.trim() !== '') {
     return (
       <div
         style={{ width: size + 4, height: size + 4 }}

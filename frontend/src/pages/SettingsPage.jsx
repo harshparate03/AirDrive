@@ -18,34 +18,45 @@ import ActivityHeatmap from '../components/charts/ActivityHeatmap'
 import ThemePicker from '../components/ui/ThemePicker'
 import { DefaultAvatar } from '../components/layout/ProfileMenu'
 
-/* ── UserAvatar helper reused from ProfileMenu ── */
+/* ── UserAvatar — shows photo or gradient initials fallback ── */
 const UserAvatar = ({ src, name, size = 96 }) => {
-  if (src) {
+  const initials = (name || 'U')
+    .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+
+  // border wrapper size = size + 5px (2.5px border each side)
+  const outer = size + 5
+
+  if (src && src.trim() !== '') {
     return (
       <div
-        style={{ width: size + 4, height: size + 4 }}
+        style={{ width: outer, height: outer }}
         className="rounded-2xl bg-gradient-to-br from-primary-400 to-purple-600 p-[2.5px] flex-shrink-0"
       >
         <img
           src={src}
-          alt={name}
+          alt={name || 'User'}
           style={{ width: size, height: size }}
           className="rounded-2xl object-cover w-full h-full block"
         />
       </div>
     )
   }
+
+  // Default — gradient initials
   return (
     <div
-      style={{ width: size + 4, height: size + 4 }}
+      style={{ width: outer, height: outer }}
       className="rounded-2xl bg-gradient-to-br from-primary-400 to-purple-600 p-[2.5px] flex-shrink-0"
     >
       <div
         style={{ width: size, height: size }}
-        className="rounded-2xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center"
+        className="rounded-2xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center w-full h-full"
       >
-        <span style={{ fontSize: size * 0.36 }} className="text-white font-bold select-none">
-          {(name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+        <span
+          style={{ fontSize: Math.max(size * 0.36, 12) }}
+          className="text-white font-bold select-none leading-none"
+        >
+          {initials}
         </span>
       </div>
     </div>
@@ -103,9 +114,14 @@ const SettingsPage = () => {
   const [photoLoading, setPhotoLoading] = useState(false)
   const photoInputRef         = useRef(null)
 
-  // Sync photo when user updates
-  useEffect(() => { setPhoto(user?.photo || '') }, [user?.photo])
-  useEffect(() => { setName(user?.name || '') },   [user?.name])
+  // Sync photo when user updates in Redux (e.g. after remove/upload)
+  useEffect(() => {
+    setPhoto(user?.photo || '')
+  }, [user?.photo])
+
+  useEffect(() => {
+    setName(user?.name || '')
+  }, [user?.name])
 
   // Password
   const [curPwd,  setCurPwd]  = useState('')
@@ -156,13 +172,15 @@ const SettingsPage = () => {
   const handleRemovePhoto = async () => {
     if (!window.confirm('Remove your profile photo?')) return
     setPhotoLoading(true)
+    // Optimistically clear photo immediately so default avatar shows right away
+    setPhoto('')
     try {
       const res = await api.patch('/users/profile', { photo: '' })
-      // Update Redux store directly with the returned user object
       dispatch(setUser(res.data.user))
-      setPhoto('')
       toast.success('Profile photo removed')
     } catch {
+      // Revert on failure
+      setPhoto(user?.photo || '')
       toast.error('Failed to remove photo')
     }
     setPhotoLoading(false)
