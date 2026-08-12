@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
-import { HiFolderAdd, HiUpload, HiChevronLeft } from 'react-icons/hi'
+import { HiFolderAdd, HiUpload, HiChevronLeft, HiRefresh, HiExclamationCircle } from 'react-icons/hi'
 import api from '../services/api'
 import FileGrid from '../components/files/FileGrid'
 import FileList from '../components/files/FileList'
@@ -29,16 +29,16 @@ const FolderPage = () => {
     return () => dispatch(clearSelection())
   }, [dispatch, folderId])
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['folder-contents', folderId],
     queryFn: () => api.get(`/folders/${folderId}/contents`).then(r => r.data),
     enabled: !!folderId,
   })
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries(['folder-contents', folderId])
-    queryClient.invalidateQueries(['files'])
-    queryClient.invalidateQueries(['folders'])
+    queryClient.invalidateQueries({ queryKey: ['folder-contents', folderId] })
+    queryClient.invalidateQueries({ queryKey: ['files'] })
+    queryClient.invalidateQueries({ queryKey: ['folders'] })
   }
 
   const folder = data?.folder
@@ -83,7 +83,16 @@ const FolderPage = () => {
 
         {isLoading && <LoadingSkeleton count={8} />}
 
-        {!isLoading && subFolders.length === 0 && files.length === 0 && (
+        {isError && (
+          <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-red-100 bg-red-50/60 px-5 text-center dark:border-red-900/40 dark:bg-red-900/10">
+            <HiExclamationCircle className="mb-3 text-5xl text-red-400" />
+            <h3 className="text-lg font-semibold text-dark-700 dark:text-dark-200">Folder could not be opened</h3>
+            <p className="mt-1 max-w-md text-sm text-dark-400">{error?.response?.data?.error || 'The folder may have been moved, deleted, or the connection was interrupted.'}</p>
+            <div className="mt-4 flex gap-2"><button type="button" onClick={() => refetch()} className="btn-primary flex items-center gap-2"><HiRefresh /> Try again</button><button type="button" onClick={() => navigate('/my-drive')} className="btn-secondary">Back to My Drive</button></div>
+          </div>
+        )}
+
+        {!isLoading && !isError && subFolders.length === 0 && files.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-20 h-20 rounded-3xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center mb-4">
               <HiUpload className="text-4xl text-primary-400" />
@@ -94,7 +103,7 @@ const FolderPage = () => {
         )}
 
         {/* Sub-folders */}
-        {!isLoading && subFolders.length > 0 && (
+        {!isLoading && !isError && subFolders.length > 0 && (
           <div>
             <h2 className="text-xs font-semibold text-dark-400 uppercase tracking-wider mb-3">Folders</h2>
             <FolderGrid folders={subFolders} onRefresh={handleRefresh} />
@@ -102,7 +111,7 @@ const FolderPage = () => {
         )}
 
         {/* Files */}
-        {!isLoading && files.length > 0 && (
+        {!isLoading && !isError && files.length > 0 && (
           <div>
             <h2 className="text-xs font-semibold text-dark-400 uppercase tracking-wider mb-3">Files</h2>
             {viewMode === 'grid'

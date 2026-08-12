@@ -136,10 +136,10 @@ const FilePreviewModal = () => {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="modal-surface card w-full max-w-2xl overflow-hidden"
+        className="card flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-b-none sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
       >
         {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-dark-700">
+        <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-100 p-4 dark:border-dark-700">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-dark-800 dark:text-dark-100 truncate">{file.name}</p>
             <p className="text-xs text-dark-400 mt-0.5">{formatFileSize(file.size)} · {file.mimeType}</p>
@@ -155,13 +155,13 @@ const FilePreviewModal = () => {
         </div>
 
         {/* Preview area */}
-        <div className="p-8 flex items-center justify-center min-h-48 bg-slate-50 dark:bg-dark-900">
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto bg-slate-50 p-4 dark:bg-dark-900 sm:p-8">
           {renderPreview()}
         </div>
 
         {/* Meta */}
         {aiTags.length > 0 && (
-          <div className="px-4 py-3 border-t border-slate-100 dark:border-dark-700">
+          <div className="max-h-40 flex-shrink-0 overflow-y-auto border-t border-slate-100 bg-white px-4 py-3 dark:border-dark-700 dark:bg-dark-800">
             <div className="mb-2 flex items-center justify-between gap-3">
               <p className="text-xs font-medium text-dark-500">AI Tags</p>
               <button type="button" onClick={() => removeTags.mutate(null)} disabled={removeTags.isPending} className="text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50">Remove all</button>
