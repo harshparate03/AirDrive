@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { HiExclamation, HiX } from 'react-icons/hi'
+import { HiExclamation, HiPhotograph, HiX } from 'react-icons/hi'
 
 const ConfirmContext = createContext(null)
 
@@ -42,8 +42,15 @@ export const ConfirmProvider = ({ children }) => {
               className="card w-full max-w-md p-5 shadow-2xl"
             >
               <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 dark:bg-red-900/20">
-                  <HiExclamation className="text-xl text-red-500" />
+                <div className={`mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
+                  dialog.danger === false
+                    ? 'bg-primary-50 dark:bg-primary-900/20'
+                    : 'bg-red-50 dark:bg-red-900/20'
+                }`}>
+                  {dialog.danger === false
+                    ? <HiPhotograph className="text-xl text-primary-500" />
+                    : <HiExclamation className="text-xl text-red-500" />
+                  }
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 id="confirm-title" className="font-semibold text-dark-900 dark:text-white">{dialog.title || 'Please confirm'}</h2>

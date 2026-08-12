@@ -16,6 +16,7 @@ import api from '../services/api'
 import { useQuery } from '@tanstack/react-query'
 import ActivityHeatmap from '../components/charts/ActivityHeatmap'
 import ThemePicker from '../components/ui/ThemePicker'
+import { useConfirm } from '../components/ui/ConfirmDialog'
 import { DefaultAvatar } from '../components/layout/ProfileMenu'
 
 /* ── UserAvatar — shows photo or gradient initials fallback ── */
@@ -99,6 +100,7 @@ const Toggle = ({ label, description, defaultChecked = true }) => (
 const SettingsPage = () => {
   const dispatch    = useDispatch()
   const location    = useLocation()
+  const confirm     = useConfirm()
   const { user }    = useSelector(s => s.auth)
   const { theme }   = useSelector(s => s.ui)
 
@@ -166,8 +168,15 @@ const SettingsPage = () => {
     e.target.value = ''
   }
 
-  const handleRemovePhoto = () => {
-    if (!window.confirm('Remove your profile photo?')) return
+  const handleRemovePhoto = async () => {
+    const ok = await confirm({
+      title: 'Remove your profile photo?',
+      message: 'Your initials avatar will be shown instead. Click Save Changes to apply this update.',
+      confirmLabel: 'Remove photo',
+      cancelLabel: 'Keep photo',
+      danger: false,
+    })
+    if (!ok) return
     if (photoAbortRef.current) {
       photoAbortRef.current.abort()
       photoAbortRef.current = null
@@ -220,7 +229,12 @@ const SettingsPage = () => {
 
   /* ── Delete account ── */
   const deleteAccount = async () => {
-    if (!window.confirm('Permanently delete your account? Cannot be undone.')) return
+    const ok = await confirm({
+      title: 'Delete your account?',
+      message: 'This permanently removes your Air Drive account and cannot be undone. Your files in Google Drive are not affected.',
+      confirmLabel: 'Delete account',
+    })
+    if (!ok) return
     try {
       await api.delete('/users/account')
       localStorage.clear()
